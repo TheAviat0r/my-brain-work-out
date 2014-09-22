@@ -19,27 +19,6 @@ int main()
         return 0;
     }
 
-    #ifdef for (int cnt = 0; cnt < strlen(stroke); cnt++)
-    {
-        ++symb;
-        printf("\nsee cnt = %d", cnt);
-
-        if (*(stroke+cnt) != '\n' && *(stroke+cnt) != ' ' && word == NO && *(stroke+cnt) != '\0')
-            word = YES;
-
-        if (word == NO && symb != 0)   // второе - проверяем на начало строки
-                for (int i = (cnt-symb-1); i <= cnt-1 ; ++i)
-                        *(stroke+(cnt-symb-1)) = *(stroke+cnt-1);
-
-        if (*(stroke+cnt) == ' ' || *(stroke+cnt) == '\n' && word == YES )
-        {
-            word = NO;
-            printf("\nsee the symbol, %d\n", symb-1);
-            symb = 0;
-        }
-
-    }
-    #endif
 
     for (int cnt = 0; cnt < strlen(stroke); cnt++)
     {
@@ -55,9 +34,9 @@ int main()
 
             for (int i = 0; i < symb/2; ++i)
             {
-                *t = *(stroke+cnt+i);
+                char t = *(stroke+cnt+i);
                 *(stroke+cnt+i) = *(stroke+symb-i)
-                *(stroke+cnt+symb-i) = *t;
+                *(stroke+cnt+symb-i) = t;
             }
         }
     }
