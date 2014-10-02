@@ -1,13 +1,36 @@
+//!====================================================================================
+//!     @file       main.cpp
+//!     @author     Niatshin Bulat
+//!     @condition  Here you can see the program that solves 10 of tasks
+//!     @task       I am too lazy to write something rightly here
+//!     @warning    I tryed to debug task 9 and others and in some cases I failed
+//!                 and now I am not able to find mistakes that I did
+//!====================================================================================
+
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
-
+//!====================================================================================
 #define YES 1
 #define NO 0
-
+//!====================================================================================
 const int INF_STR = 150;
+const int INF_NUM = 10000;
+//!====================================================================================
+struct answer_t
+{
+        int point_one;
+        int point_two;
+        double rebro;
+};
+
+struct point_t
+{
+        double coord_x;
+        double coord_y;
+};
 
 //!=========================
 void task_one(void);
@@ -26,6 +49,8 @@ void task_four(void);
 //!=========================
 void task_five(void);
 //!=========================
+    answer_t len_max(point_t buf[], int number);
+//!=========================
 void task_six(void);
 //!=========================
 void task_seven(void);
@@ -34,6 +59,7 @@ void task_eight(void);
 //!=========================
 void task_nine(void);
 //!=========================
+    void get_binsum(char number_one[], char number_two[]);
 void task_ten(void);
 //!=========================
 
@@ -162,8 +188,8 @@ int isprime(int value)
 {
     if (value == 1)
         return 0; //! 1 is not a simple falue
-    for (int i = 2; i < sqrt(value); ++i)
-        if ((value-1) % i == 0)
+    for (int i = 2; i < (value); ++i)
+        if ((value) % i == 0)
             return 0;
     return 1;
 }
@@ -220,6 +246,7 @@ void task_four(void)
     printf("\n=====================================================\n");
     printf("Here you can see the program that inverts words in stroke\n");
     printf("Type your stroke\n");
+    scanf(" ");
 
     gets(my_str);
 
@@ -233,37 +260,29 @@ void task_four(void)
         assert( 0 <= i && i < len);
 
         char work = ' ';
+        char safe = 0;
         if (isalpha(my_str[i]) && word == NO)
         {
             thebegin = i;
             word = YES;
         }
 
-        if ( (isspace(my_str[i]) || my_str[i] == '\0') && word == YES)
+        if ( (isspace(my_str[i]) || my_str[i+1] == '\0') && word == YES)
         {
             theend = i - 1;
             word = NO;
 
+            safe = my_str[i];
             my_str[i] = '\0';
+            if (my_str[i+1] == 0)
+                my_str[i] = safe;
             strrev(my_str+thebegin);
             my_str[i] = work;
         }
     }
 
 
-    /*for (int i = 0; i <= len; ++i)
-    {
-        assert(0 <= i && i <= len);
-
-        char work = ' ';
-        if(my_str[i] !=' ' && (my_str[i+1] = ' '|| my_str[i+1] == '\n' ||my_str[i] == 'NULL'))
-        {
-            work = my_str[i+1];
-            my_str[i+1] = '\0';
-            strrev(my_str);
-            my_str[i+1] = work;
-        }
-    }*/
+    printf ("you got: <%s>\n", my_str);
     puts(my_str);
     printf("If you want to continue, type number of the next task\n");
     printf("If you want to exit, type 11\n");
@@ -271,24 +290,220 @@ void task_four(void)
 //!=====================================================================
 void task_five(void)
 {
+    point_t buf [1000] = {};
+    answer_t result = {};
+
+
+    printf("Type the number of points");
+
+    int number = 0;
+    scanf("%d", &number);
+
+    printf("Now type coordinates of your points");
+
+    for (int i = 0; i < number; ++i)
+        scanf("%lf %lf", &buf[i].coord_x, &buf[i].coord_y);
+
+    result = len_max(buf, number);
+
+    printf("!*!*!*!*!*!*!*!*!*!*!*!*!*!\n");
+    printf(" N1 = %d N2 = %d Length = %10.6lf\n", result.point_one, result.point_two, \
+                                                    result.rebro);
+
 
 }
 //!=====================================================================
+double get_len (point_t a, point_t b)
+{
+    double len = sqrt(pow(a.coord_x - b.coord_x,2) + pow(a.coord_y - b.coord_y,2));
+    return len;
+}
+
+answer_t len_max(point_t buf[], int number)
+{
+    answer_t result = {};
+    result.point_one = 1;
+    result.point_two = 2;
+
+    double maxlen = get_len(buf[0], buf[1]);
+
+    for (int i = 0; i < number; ++i)
+        for (int j = 1; j < number; ++j)
+            if (get_len(buf[i], buf[j]) > maxlen)
+            {
+                maxlen = get_len(buf[i], buf[j]);
+                result.point_one = i;
+                result.point_two = j;
+            }
+
+    result.rebro = maxlen;
+
+    return result;
+}
+//!=====================================================================
+//!=====================================================================
 void task_six(void)
 {
+    printf("\n========================================================\n");
+    printf("Type your number\n");
+
+    int number = 0, sum = 0;
+    scanf("%d", &number);
+
+    for (int i = 1; i <= number; ++i)
+    {
+        if (number % i == 0)
+            sum +=i;
+    }
+
+    printf(" sum = %d\n", sum);
+
 }
 //!=====================================================================
 void task_seven(void)
 {
+    printf("||-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-||\n");
+    printf("WELCOME! Type how many prime numbers you want to get\n");
+
+    int number = 0;
+    int values[INF_NUM] = {};
+    scanf("%d", &number);
+    assert(number > 0);
+
+    printf("Now type your numbers\n");
+
+    for (int i = 0; i < number; ++i)
+        scanf("%d", &values[i]);
+
+    for (int i = 0; i < number; ++i)
+        printf("value %d = %d ", (i+1) ,search_numb(values[i]));
+
+    printf("NICE TO SEE YOU!\n");
+
 }
 //!=====================================================================
 void task_eight(void)
 {
+    task_three();
 }
 //!=====================================================================
 void task_nine(void)
 {
+    printf("^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^_^\n");
+    printf("This is nyan binary sum\n");
+    printf("Type your two strokes\n");
+
+    char number_one [INF_STR] = {};
+    char number_two [INF_STR] = {};
+    //char result [INF_STR] = {};
+
+    scanf(" ");
+    gets(number_one);
+    scanf(" ");
+    gets(number_two);
+
+    printf("N1 = <%s>, N2 = <%s>\n", number_one, number_two);
+
+    strrev(number_one);
+    strrev(number_two);
+    printf("REV N1 = <%s>, N2 = <%s>\n", number_one, number_two);
+
+    get_binsum(number_one, number_two);
+
 }
+
+void get_binsum(char number_one[], char number_two[])
+{
+    int len_one = strlen(number_one);
+    int len_two = strlen(number_two);
+
+    assert(len_one >= 0 && len_two >= 0);
+
+    if (len_one > len_two)
+    {
+        for (int i = 0; i < len_two; ++i)
+        {
+            assert(0 <= i && i < len_two);
+
+            if (number_one[i] == '0')
+                number_one[i] = number_two[i];
+            else
+            {
+                if (number_two[i] == '1')
+                {
+                    number_one[i] == '0';
+
+                    int cnt_one = 1;
+                    int cnt_beg = i, cnt_end = 0;;
+
+                    int cnt_symb = 0;
+
+                    for (int j = i+1; j <= len_two; ++j)
+                        if (number_one[j] == '1' && (number_one[j+1] == '1' || number_one[j+1] == 0))
+                        {
+                            ++cnt_symb;
+                            cnt_end =j;
+                            number_one[j] = 0;
+                            if (number_one[j+1] == '0' || number_one[j+1] == 0)
+                            {
+                                    i = j - 1;
+                                    break;
+                            }
+                        }
+
+                    for (int k = cnt_end; k <= (cnt_symb+cnt_end); ++k)
+                        number_one[k] = '1';
+                }
+            }
+        }
+
+        printf("see your sum = ");
+        strrev(number_one);
+        puts(number_one);
+        printf("\nthis is the end of the task. Type new number pls\n");
+    }
+    else
+    {
+        for (int i = 0; i < len_one; ++i)
+        {
+            assert(0 <= i && i < len_one);
+
+            if (number_two[i] == '0')
+                number_two[i] = number_one[i];
+            else
+            {
+                if (number_one[i] == '1')
+                {
+                    number_two[i] == '0';
+
+                    /*int cnt_one = 1;
+                    int cnt_beg = i;
+                    int cnt_end = 0;*/
+
+                    for (int j = i+1; j <= (len_one); ++j)
+                        if (number_two[j] == '1' && (number_two[j+1] == '1' || number_two[j+1] == 0))
+                        {
+                            number_two[j] = '0';
+                            number_two[j+1] = '1';
+                                if (number_two[j+1] == '0' || number_two[j+1] == 0);
+                                    break;
+                        }
+
+                    //for (int i = cnt_beg; i <= cnt_end; ++i);
+                        //number_one[i] = '1';
+                }
+            }
+        }
+
+        printf("see your sum = ");
+        strrev(number_two);
+        puts(number_two);
+        printf("\nthis is the end of the task. Type new number pls\n");
+    }
+
+}
+
+
 //!=====================================================================
 void task_ten(void)
 {
