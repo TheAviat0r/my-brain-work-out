@@ -20,13 +20,13 @@
 
 void greeting(void);
 //!=========================================================================================
-int countStr (char buffer[], int flen);
+int countStr (unsigned char buffer[], int flen);
 //!=========================================================================================
-void placeStr (char **data, char buffer[], int flen, int nStroke);
+void placeStr (unsigned char **data, unsigned char buffer[], int flen, int nStroke);
 //!=========================================================================================
 int ComparePls (const void * a, const void * b);
 //!=========================================================================================
-void prepareBuff (char *buffer, int flen);
+void prepareBuff (unsigned char *buffer, int flen);
 
 int main()
 {
@@ -38,10 +38,10 @@ int main()
     if ( (input = fopen("input.txt", "r")) != 0)
     {
         int flen = filelength(fileno(input));
-        DBG printf("File Length = %d\n", flen);
+        printf("File Length = %d\n", flen);
         //!================================
-        char * buffer = (char *) calloc(flen+1, sizeof(*buffer));
-        fread(buffer, flen, sizeof(char*), input);
+        unsigned char * buffer = (unsigned char *) calloc(flen+1, sizeof(*buffer));
+        fread(buffer, flen, sizeof(unsigned char*), input);
         //!================================
         //buffer[flen+1] = 0;
         //!================================
@@ -49,36 +49,36 @@ int main()
         printf("This is a default buffer\n");
         //!================================
         printf("====================================================================\n");
-        puts(buffer);
-        //prepareBuff(buffer, flen);
+        puts((char*)buffer);
+        prepareBuff(buffer, flen);
         printf("====================================================================\n");
-        puts(buffer);
+        puts((char*)buffer);
 
         printf("====================================================================\n");
         //!================================
         int nStroke = countStr(buffer, flen);
         printf("nStroke = %d\n", nStroke);
         //!================================
-        char **data = (char **) calloc(nStroke, sizeof(* data));
+        unsigned char **data = (unsigned char **) calloc(nStroke, sizeof(* data));
         placeStr(data, buffer, flen, nStroke);
         //!================================
-        qsort(data, nStroke, sizeof(char *), &ComparePls);
+        qsort(data, nStroke, sizeof(unsigned char *), &ComparePls);
         //!================================
         printf("====================================================================\n");
         for (int i = 0; i < nStroke; ++i)
-            puts(data[i]);
+            puts((char *)data[i]);
         //!================================
         for (int i = 0; i < nStroke; ++i)
-            strrev(data[i]);
+            strrev((char*)data[i]);
 
-        qsort(data, nStroke, sizeof(char *), &ComparePls);
+        qsort(data, nStroke, sizeof(unsigned char *), &ComparePls);
         //!================================
         for (int i = 0; i < nStroke; ++i)
-            strrev(data[i]);
+            strrev((char*)data[i]);
         //!================================
         printf("=====================================================================\n");
         for (int i = 0; i < nStroke; ++i)
-            puts(data[i]);
+            puts((char*)data[i]);
         //!================================
         free(buffer);
         free(data);
@@ -94,14 +94,17 @@ int main()
     //!================================
 }
 
-void prepareBuff (char *buffer, int flen)
+void prepareBuff (unsigned char *buffer, int flen)
 {
     for (int i = 0; i < flen; ++i)
     {
         assert (0 <= i && i < flen);
         if (!isalpha(buffer[i]) && !isspace(buffer[i]) && (buffer[i] != '\n') && (buffer[i] != NULL) &&\
                                                                                 buffer[i] != 239)
+        {
+            printf("buffer[i] =  %c ASCI <%d> [0x%x]\n", buffer[i], buffer[i], buffer+i);
             buffer[i] = ' ';
+        }
     }
 }
 //!================================
@@ -110,7 +113,7 @@ int ComparePls (const void * a, const void * b)
     return strcmp (*(char **)a, *(char **)b);
 }
 //!================================
-int countStr (char buffer[], int flen)
+int countStr (unsigned char buffer[], int flen)
 {
     assert(buffer != NULL && flen != NULL);
     int nStroke = 1;
@@ -128,14 +131,14 @@ int countStr (char buffer[], int flen)
     return nStroke;
 }
 //!================================
-void placeStr (char **data, char buffer[], int flen, int nStroke)
+void placeStr (unsigned char **data, unsigned char buffer[], int flen, int nStroke)
 {
     assert( data != NULL && buffer != NULL);
     //!================================
     data[0] = buffer;
     printf("=============\nthis is placeStr\n");
     printf("====================================================================\n");
-    puts(data[0]);
+    puts((char *)data[0]);
     int cnt = 1;
     //!================================
     printf("data %d buffer %d \n", *data, buffer); //checking that adress of data[0] and buffer are the same
