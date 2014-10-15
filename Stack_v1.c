@@ -42,6 +42,8 @@ const char LIST [] =    "list";
 const char DUMP [] =    "dump";
 const char SHOW [] =    "show";
 const char SUM []  =    "sumup";
+const char DBG [] =     "debug";
+const char NDBG [] =    "nodebug";
 //!===========================================
 struct stack_t
 {
@@ -49,6 +51,7 @@ struct stack_t
     int cnt;
     int flag;
     int freemem;
+    int dbg;
     double *buffer;
 };
 //!===========================================
@@ -198,6 +201,22 @@ int main()
                 scanf("%s", command);
                 continue;
             }
+            if (!strcmp(command, DBG))
+            {
+                mystack.dbg = 1;
+                SLASHES;
+                printf("#DEBUG ON!\n");
+                scanf("%s", &command);
+                continue;
+            }
+            if (!strcmp(command, NDBG))
+            {
+                SLASHES;
+                printf("#DEBUG OFF!\n");
+                mystack.dbg = 0;
+                scanf("%s", &command);
+                continue;
+            }
 
             if (strcmp(command, START))
                 printf("#Incorrect command! Try again! If you need help - type list\n");
@@ -274,7 +293,8 @@ int stack_ok(stack_t *work)
         abort();
         //return 3;
     }
-    //dump_ok(work);
+    if (work->dbg)
+        dump_ok(work);
     return 0;
 }
 //!===========================================
@@ -315,6 +335,9 @@ void FAQ(void)
     printf("nsum    - minus operation\n");
     printf("exit    - end program\n");
     printf("dump    - see the dump\n");
+    printf("show    - show current stack\n");
+    printf("debug   - debug MODE is ON\n");
+    printf("nodebug - debug MODe is OFF\n");
     SLASHES;
     EMPT;
 }
@@ -362,6 +385,7 @@ void popData(stack_t *work)
 //!===========================================
 void delData(stack_t *work)
 {
+    //work->buffer = 0;
     stack_ok(work);
 
     work->freemem = STARTMEM;
@@ -448,6 +472,7 @@ void nsumData(stack_t *work)
 //!===========================================
 void multData(stack_t *work)
 {
+    stack_ok(work);
     if (work->cnt == 1 || work->cnt == 0)
     {
         printf("#Stack is empty! Unable to multiply\n!");
@@ -457,12 +482,14 @@ void multData(stack_t *work)
         pushData(work, *(work->buffer + work->cnt - 2) * *(work->buffer + work->cnt - 1));
         resData(work);
     }
+    stack_ok(work);
 }
 //!===========================================
 void showData(stack_t *work)
 {
     //printf("this is show data\n");
     SLASHES;
+    stack_ok(work);
     for (int i = 0; i < work->cnt; i++)
     {
         //assert(0 <= i && i < work->cnt);
@@ -473,6 +500,7 @@ void showData(stack_t *work)
 //!===========================================
 void resData(stack_t *work)
 {
+    stack_ok(work);
     printf("\tresult = <%lg>\n", *(work->buffer + work->cnt - 1));
 }
 //!===========================================
