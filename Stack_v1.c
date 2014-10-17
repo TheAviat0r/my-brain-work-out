@@ -1,3 +1,4 @@
+
 //!============================================================================
 //!     @file       Stack_v1.c
 //!     @author     Niatshin Bulat
@@ -105,6 +106,7 @@ int main()
     //!===========================================
     //!printf("stack size = <%d>\n", mystack.stackSZ);
     mystack.buffer = (double *) calloc(5, sizeof(double));
+    assert(mystack.buffer);
     //dump_ok(&mystack);
     //!===========================================
     printf("Lets start our program! \n");
@@ -457,7 +459,7 @@ void addMem(stack_t *work)
     work->stackSZ *= 2;
 
     work->buffer = (double *) realloc(work->buffer, (work->stackSZ)*sizeof(double));
-    for (int i = work->stackSZ/2; i <= work->stackSZ; ++i)
+    for (int i = work->cnt; i < work->stackSZ; ++i)
         *(work->buffer + i) = 0;
 
     stack_ok(work);
@@ -521,7 +523,7 @@ void pushData(stack_t *work, double numb)
 void popData(stack_t *work)
 {
     stack_ok(work);
-    if (work->cnt >= 0)
+    if (work->cnt > 0)
     {
         *(work->buffer + work->cnt-1) = 0;
         work->cnt--;
@@ -650,7 +652,7 @@ void showData(stack_t *work)
 void resData(stack_t *work)
 {
     stack_ok(work);
-    printf("\tresult = <%lg>\n", *(work->buffer + work->cnt - 1));
+    printf("\t%lg\n", *(work->buffer + work->cnt - 1));
 }
 //!===========================================
 void sumData(stack_t *work)
@@ -670,6 +672,7 @@ void sqrData(stack_t *work)
     //printf("this is sqrData\n");
     pushData(work, pow(work->buffer[work->cnt-1], 2));
 }
+//!===========================================
 void sqrtData(stack_t *work)
 {
     if (work->buffer[work->cnt - 1] >= 0)

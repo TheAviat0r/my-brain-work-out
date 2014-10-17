@@ -1,0 +1,126 @@
+push 1
+print 1
+push 0.01
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.02
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.03
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.04
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.05
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.06
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.07
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.08
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.09
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.1
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.11
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.12
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.13
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.14
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.15
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.16
+sqr
+push 1
+nsum
+push -1
+mult
+print
+push 0.17
+sqr
+push 1
+nsum
+push -1
+mult
+print
+exit
+
+
+
+
