@@ -44,6 +44,11 @@ const char SHOW [] =    "show";
 const char SUM []  =    "sumup";
 const char DBG [] =     "debug";
 const char NDBG [] =    "nodebug";
+const char FILEM [] =   "file";
+const char CONS [] =    "console";
+const char RES [] =     "print";
+const char SQR [] =     "sqr";
+const char SQRT [] =    "sqrt";
 //!===========================================
 struct stack_t
 {
@@ -83,6 +88,9 @@ void resData (stack_t *work);
 //!===========================================
 void sumData (stack_t *work);
 //!===========================================
+void sqrData (stack_t *work);
+//!===========================================
+void sqrtData (stack_t *work);
 int main()
 {
     SLASHES;
@@ -121,117 +129,256 @@ int main()
     }
     SLASHES;
     //!===========================================
-    printf("Type start to begin\n");
-    char command[10] = {};
-    double numb = 0;
-    scanf("%s", command);
-
-    if (!strcmp(command, START))
-    {
-        printf("\n{\n");
-        //!===========================================
-        while (strcmp(command, EXIT))
-        {
-            if (!strcmp(command, PUSH))
-            {
-                if (scanf("%lf", &numb) == 1)
-                    pushData(&mystack, numb);
-                else
-                    printf("Wrong input! Number type should be double!\n");
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, POP))
-            {
-                popData(&mystack);
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, CLEAR))
-            {
-                delData(&mystack);
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, DIV))
-            {
-                divData(&mystack);
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, PLUS))
-            {
-                plusData(&mystack);
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, NSUM))
-            {
-                nsumData(&mystack);
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, MULT))
-            {
-                multData(&mystack);
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, LIST))
-            {
-                FAQ();
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, DUMP))
-            {
-                dump_ok(&mystack);
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, SHOW))
-            {
-                showData(&mystack);
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, SUM))
-            {
-                sumData(&mystack);
-                scanf("%s", command);
-                continue;
-            }
-            if (!strcmp(command, DBG))
-            {
-                mystack.dbg = 1;
-                SLASHES;
-                printf("#DEBUG ON!\n");
-                scanf("%s", &command);
-                continue;
-            }
-            if (!strcmp(command, NDBG))
-            {
-                SLASHES;
-                printf("#DEBUG OFF!\n");
-                mystack.dbg = 0;
-                scanf("%s", &command);
-                continue;
-            }
-
-            if (strcmp(command, START))
-                printf("#Incorrect command! Try again! If you need help - type list\n");
-            scanf("%s", command);
-        }
-    }
+    printf("Choose your mode: <file> or <console> \n");
+    char mode[10] = {};
+    scanf("%s", mode);
     //!===========================================
+    if (!strcmp(mode, CONS))
+    {
+        EMPT;
+        SLASHES;
+        dump_ok(&mystack);
+        printf("Type start to begin\n");
+        char command[10] = {};
+        double numb = 0;
+        scanf("%s", command);
+
+        if (!strcmp(command, START))
+        {
+            printf("\n{\n");
+            //!===========================================
+            while (strcmp(command, EXIT))
+            {
+                if (!strcmp(command, PUSH))
+                {
+                    if (scanf("%lf", &numb) == 1)
+                        pushData(&mystack, numb);
+                    else
+                        printf("Wrong input! Number type should be double!\n");
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, POP))
+                {
+                    popData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, CLEAR))
+                {
+                    delData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, DIV))
+                {
+                    divData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, PLUS))
+                {
+                    plusData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, NSUM))
+                {
+                    nsumData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, MULT))
+                {
+                    multData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, LIST))
+                {
+                    FAQ();
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, DUMP))
+                {
+                    dump_ok(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, SHOW))
+                {
+                    showData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, SUM))
+                {
+                    sumData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, DBG))
+                {
+                    mystack.dbg = 1;
+                    SLASHES;
+                    printf("#DEBUG ON!\n");
+                    scanf("%s", &command);
+                    continue;
+                }
+                if (!strcmp(command, NDBG))
+                {
+                    SLASHES;
+                    printf("#DEBUG OFF!\n");
+                    mystack.dbg = 0;
+                    scanf("%s", &command);
+                    continue;
+                }
+                if (!strcmp(command, SQR))
+                {
+                    sqrData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, SQRT))
+                {
+                    sqrtData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+                if (!strcmp(command, RES))
+                {
+                    resData(&mystack);
+                    scanf("%s", command);
+                    continue;
+                }
+
+                if (strcmp(command, START))
+                    printf("#Incorrect command! Try again! If you need help - type list\n");
+                scanf("%s", command);
+            }
+            free(mystack.buffer);
+        }
+        //!===========================================
 
 
+        return 0;
+    }
 
+    if (!strcmp(mode, FILEM))
+    {
+        FILE *input = 0;
+        if (input = fopen("input.txt", "r"))
+        {
+            EMPT;
+            SLASHES;
+            printf("#<input.txt> is successfully opened\n");
+            mystack.dbg = 0;
 
-    //addMem(&mystack);
-    //dump_ok(&mystack);
+            char command[10] = {};
+            double value = 0;
 
+            while ((fscanf(input, "%s%lf", command, &value) != EOF) && (strcmp(command, EXIT) != 0))
+            {
+                //printf("command = <%s> value = <%lg>\n", command, value);
+                if (!strcmp(command, PUSH))
+                {
+                    pushData(&mystack, value);
+                    continue;
+                }
+                if (!strcmp(command, POP))
+                {
+                    popData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, CLEAR))
+                {
+                    delData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, DIV))
+                {
+                    divData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, PLUS))
+                {
+                    plusData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, NSUM))
+                {
+                    nsumData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, MULT))
+                {
+                    multData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, LIST))
+                {
+                    FAQ();
+                    continue;
+                }
+                if (!strcmp(command, DUMP))
+                {
+                    dump_ok(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, SHOW))
+                {
+                    showData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, SUM))
+                {
+                    sumData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, DBG))
+                {
+                    mystack.dbg = 1;
+                    SLASHES;
+                    printf("#DEBUG ON!\n");
+                    continue;
+                }
+                if (!strcmp(command, NDBG))
+                {
+                    SLASHES;
+                    printf("#DEBUG OFF!\n");
+                    mystack.dbg = 0;
+                    continue;
+                }
+                if (!strcmp(command, RES))
+                {
+                    resData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, SQR))
+                {
+                    sqrData(&mystack);
+                    continue;
+                }
+                if (!strcmp(command, SQRT))
+                {
+                    sqrtData(&mystack);
+                    continue;
+                }
+            }
+            free(mystack.buffer);
+        }
+        else
+        {
+            printf("ERROR! Wrong input!\n");
+        }
+        return 0;
+    }
+
+    SLASHES;
+    printf("ERROR mode! Try again!\n");
     return 0;
+
 }
 //!===========================================
 void dump_ok(stack_t *work)
@@ -344,7 +491,9 @@ void FAQ(void)
 //!===========================================
 void pushData(stack_t *work, double numb)
 {
-
+    //SLASHES;
+    //printf("this is pushData!\n");
+    //printf("I push <%lg> into stack\n", numb);
     if (!stack_ok(work))
     {
 
@@ -387,6 +536,7 @@ void delData(stack_t *work)
 {
     //work->buffer = 0;
     stack_ok(work);
+    printf("# Stack is empty now!\n");
 
     work->freemem = STARTMEM;
     work->stackSZ = STARTMEM;
@@ -433,7 +583,6 @@ void divData(stack_t *work)
         if (*(work->buffer + work->cnt -1))
         {
             pushData(work, *(work->buffer + work->cnt - 2)/(*(work->buffer + work->cnt - 1)));
-            resData(work);
         }
         else
         {
@@ -453,7 +602,6 @@ void plusData(stack_t *work)
     else
     {
         pushData(work, *(work->buffer + work->cnt - 2) + *(work->buffer + work->cnt - 1));
-        resData(work);
     }
 }
 //!===========================================
@@ -465,8 +613,9 @@ void nsumData(stack_t *work)
     }
     else
     {
-        pushData(work, *(work->buffer + work->cnt - 2) - *(work->buffer + work->cnt - 1));
-        resData(work);
+        //printf("this is nsum!\n");
+        //printf("a = <%lg> b = <%lg>\n", work->buffer[work->cnt - 2], work->buffer[work->cnt - 1]);
+        pushData(work, work->buffer[work->cnt - 2] - work->buffer[work->cnt - 1]);
     }
 }
 //!===========================================
@@ -479,8 +628,8 @@ void multData(stack_t *work)
     }
     else
     {
-        pushData(work, *(work->buffer + work->cnt - 2) * *(work->buffer + work->cnt - 1));
-        resData(work);
+        pushData(work, (work->buffer[work->cnt - 2]) * (work->buffer[work->cnt - 1]));
+        //resData(work);
     }
     stack_ok(work);
 }
@@ -493,7 +642,7 @@ void showData(stack_t *work)
     for (int i = 0; i < work->cnt; i++)
     {
         //assert(0 <= i && i < work->cnt);
-        printf("b[%d] = <%lg>\n", i, *(work->buffer + i));
+        printf("b[%d] = <%lg>\n", i, work->buffer[i]);
     }
     SLASHES;
 }
@@ -513,5 +662,28 @@ void sumData(stack_t *work)
         sum += *(work->buffer + i);
     }
     pushData(work, sum);
-    resData(work);
+    //resData(work);
+}
+//!===========================================
+void sqrData(stack_t *work)
+{
+    //printf("this is sqrData\n");
+    pushData(work, pow(work->buffer[work->cnt-1], 2));
+}
+void sqrtData(stack_t *work)
+{
+    if (work->buffer[work->cnt - 1] >= 0)
+    {
+        pushData(work, sqrt(work->buffer[work->cnt - 1]));
+    }
+    else
+    {
+        printf("Unable to get root!\nValue is negative\n");
+        printf("Type new value, pls\n");
+        int num = 0;
+        scanf("%lf", &num);
+
+        popData(work);
+        pushData(work, num);
+    }
 }
