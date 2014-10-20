@@ -16,11 +16,15 @@
 #include <string.h>
 #include <assert.h>
 //!===========================================
-//#define assert_ok { if(!cond) {\
-                                printf("FAIL: %s, in %s,%d, %s \n", #cond, \
-                                __FILE__, __LINE__, __PRETTY_FUNCTION__);\
-                                dump_ok(&mystack);\
-                                abort();}
+#define DEBUG
+#ifdef DEBUG
+#define assert_ok(cond) if(!(cond)){\
+                        printf("FAIL: %s in %s, %d %;", \
+                        #cond, __FILE__, __LINE__, __PRETTY_FUNCTION__);\
+                        EMPT; dump_ok(work);};
+#else #define assert_ok(cond) if(0);
+#endif
+
 #define SLASHES printf("===============================================\n");
 #define BUF work->buffer
 #define CNT work->cnt
@@ -35,7 +39,7 @@ const char PUSH [] =    "push";
 const char POP [] =     "pop";
 const char CLEAR [] =   "clear";
 const char DIV [] =     "div";
-const char PLUS [] =    "plus";
+const char PLUS [] =    "add";
 const char MULT [] =    "mult";
 const char NSUM [] =    "nsum";
 const char START [] =   "start";
@@ -55,7 +59,6 @@ struct stack_t
 {
     int stackSZ;
     int cnt;
-    int flag;
     int freemem;
     int dbg;
     double *buffer;
@@ -69,7 +72,7 @@ void addMem (stack_t *work);
 //!===========================================
 void pushData (stack_t *work, double numb);
 //!===========================================
-void popData (stack_t *work);
+double popData (stack_t *work);
 //!===========================================
 void delData (stack_t *work);
 //!===========================================
@@ -275,6 +278,7 @@ int main()
             EMPT;
             SLASHES;
             printf("#<input.txt> is successfully opened\n");
+            EMPT;
             mystack.dbg = 0;
 
             char command[10] = {};
@@ -390,7 +394,6 @@ void dump_ok(stack_t *work)
     printf("I AM THE DUMPER!!!\n");
 
     //work->cnt = 0;
-    work->flag = 0;
     printf("{\n");
     printf("      buffer adress = [0x%p]\n", work->buffer);
     printf("      stackSZ = <%d>\n", work->stackSZ);
@@ -398,18 +401,17 @@ void dump_ok(stack_t *work)
     printf("      cnt = <%d>\n", work->cnt);
 
     EMPT;
-    for (work->flag = 0; work->flag < (work->cnt); ++work->flag)
+    for (int i = 0; i < (work->cnt); ++i)
     {
         //assert_ok(0 <= work.flag && work->flag < work->stackSZ);
-        printf("    ->buffer[%d] [0x%p] = (%lg)\n", work->flag, work->buffer + work->flag, *(work->buffer + work->flag));
+        printf("    ->buffer[%d] [0x%p] = (%lg)\n", i, work->buffer + i, *(work->buffer + i));
         //printf("    flag = %d\n", work->flag);
     }
-    for (work->flag = work->cnt; work->flag < work->stackSZ; ++work->flag)
+    for (int i = work->cnt; i < work->stackSZ; ++i)
     {
-        printf("      buffer[%d] [0x%p] = (%lg)\n", work->flag, work->buffer + work->flag, *(work->buffer + work->flag));
+        printf("      buffer[%d] [0x%p] = (%lg)\n", i, work->buffer + i, work->buffer[i]);
     }
     printf("}\n");
-    work->flag = 0;
     SLASHES;
     EMPT;
 }
@@ -423,24 +425,19 @@ int stack_ok(stack_t *work)
     {
         SLASHES;
         printf("ERR#1\n");
-        dump_ok(work);
-        abort();
+        return 1;
     }
     if (work->freemem < 0)
     {
         SLASHES;
         printf("ERR#2\n");
-        dump_ok(work);
-        abort();
-        //return 2;
+        return 2;
     }
     if (CNT < -1)
     {
         SLASHES;
         printf("ERR#3\n");
-        dump_ok(work);
-        abort();
-        //return 3;
+        return 3;
     }
     if (work->dbg)
         dump_ok(work);
@@ -520,24 +517,30 @@ void pushData(stack_t *work, double numb)
 
 }
 //!===========================================
-void popData(stack_t *work)
+double popData(stack_t *work)
 {
-    stack_ok(work);
+    assert_ok(stack_ok(work) == NULL);
     if (work->cnt > 0)
     {
+        double save = work->buffer[work->cnt - 1];
         *(work->buffer + work->cnt-1) = 0;
         work->cnt--;
         work->freemem++;
+        return save;
     }
-
-    if (work->cnt == -1) work->cnt = 0;
-    stack_ok(work);
+    else
+    {
+        printf("Stack is empty! No anything to pop!\n");
+        return 0;
+    }
+    //if (work->cnt == -1) work->cnt = 0;
+    assert_ok(stack_ok(work) == NULL);
 }
 //!===========================================
 void delData(stack_t *work)
 {
     //work->buffer = 0;
-    stack_ok(work);
+    assert_ok(stack_ok(work) == NULL);
     printf("# Stack is empty now!\n");
 
     work->freemem = STARTMEM;
@@ -546,8 +549,8 @@ void delData(stack_t *work)
     work->buffer = (double *)realloc(work->buffer, STARTMEM*sizeof(double));
 
     for (int i = 0; i < work->stackSZ; ++i)
-        *(work->buffer + i) = 0;
-    stack_ok(work);
+        work->buffer[i] = 0;
+    assert_ok(stack_ok(work) == NULL);
 }
 //!===========================================
 void divData(stack_t *work)
@@ -582,9 +585,11 @@ void divData(stack_t *work)
     }
     else
     {
-        if (*(work->buffer + work->cnt -1))
+        if (work->buffer[work->cnt -1] != NULL)
         {
-            pushData(work, *(work->buffer + work->cnt - 2)/(*(work->buffer + work->cnt - 1)));
+            double first = popData(work);
+            double second = popData(work);
+            pushData(work, second/first);
         }
         else
         {
@@ -599,11 +604,11 @@ void plusData(stack_t *work)
 {
     if (work->cnt == 1 || work->cnt == 0)
     {
-        printf("#Stack is empty! Unable to sum up\n");
+        printf("#Stack is empty! Unable to add\n");
     }
     else
     {
-        pushData(work, *(work->buffer + work->cnt - 2) + *(work->buffer + work->cnt - 1));
+        pushData(work, popData(work) + popData(work));
     }
 }
 //!===========================================
@@ -615,32 +620,37 @@ void nsumData(stack_t *work)
     }
     else
     {
+        assert(stack_ok(work) == NULL);
         //printf("this is nsum!\n");
         //printf("a = <%lg> b = <%lg>\n", work->buffer[work->cnt - 2], work->buffer[work->cnt - 1]);
-        pushData(work, work->buffer[work->cnt - 2] - work->buffer[work->cnt - 1]);
+        double first = popData(work);
+        double second = popData(work);
+
+        pushData(work, second - first);
+        assert(stack_ok(work) == NULL);
     }
 }
 //!===========================================
 void multData(stack_t *work)
 {
-    stack_ok(work);
+    assert(stack_ok(work) == NULL);
     if (work->cnt == 1 || work->cnt == 0)
     {
         printf("#Stack is empty! Unable to multiply\n!");
     }
     else
     {
-        pushData(work, (work->buffer[work->cnt - 2]) * (work->buffer[work->cnt - 1]));
+        pushData(work, popData(work) * popData(work));
         //resData(work);
     }
-    stack_ok(work);
+    assert(stack_ok(work) == NULL);
 }
 //!===========================================
 void showData(stack_t *work)
 {
     //printf("this is show data\n");
     SLASHES;
-    stack_ok(work);
+    assert(stack_ok(work) == NULL);
     for (int i = 0; i < work->cnt; i++)
     {
         //assert(0 <= i && i < work->cnt);
@@ -651,18 +661,22 @@ void showData(stack_t *work)
 //!===========================================
 void resData(stack_t *work)
 {
-    stack_ok(work);
-    printf("\t%lg\n", *(work->buffer + work->cnt - 1));
+    assert(stack_ok(work) == NULL);
+    printf("\t<%lg>\n", popData(work));
 }
 //!===========================================
 void sumData(stack_t *work)
 {
     double sum = 0;
-    for (int i = 0; i < work->cnt; ++i)
+
+    assert(stack_ok(work) == NULL);
+    for (int i = work->cnt; i > 0; --i)
     {
-        assert(0 <= i && i < work->cnt);
-        sum += *(work->buffer + i);
+        assert_ok(0 < i && i <= work->cnt);
+        sum += popData(work);
     }
+    assert(stack_ok(work) == NULL);
+
     pushData(work, sum);
     //resData(work);
 }
@@ -670,23 +684,27 @@ void sumData(stack_t *work)
 void sqrData(stack_t *work)
 {
     //printf("this is sqrData\n");
-    pushData(work, pow(work->buffer[work->cnt-1], 2));
+    assert(stack_ok(work) == NULL);
+
+    if (work->cnt > 0)
+        pushData(work, pow(popData(work), 2));
+    else
+        printf("Stack is empty! Unable to square the value!\n");
+    assert(stack_ok(work) == NULL);
 }
 //!===========================================
 void sqrtData(stack_t *work)
 {
-    if (work->buffer[work->cnt - 1] >= 0)
+    double value = popData(work);
+    if (value > 0)
     {
-        pushData(work, sqrt(work->buffer[work->cnt - 1]));
+        assert(stack_ok(work) == NULL);
+        pushData(work, sqrt(value));
+        assert(stack_ok(work) == NULL);
     }
     else
     {
         printf("Unable to get root!\nValue is negative\n");
-        printf("Type new value, pls\n");
-        int num = 0;
-        scanf("%lf", &num);
-
-        popData(work);
-        pushData(work, num);
+        printf("This negative value will be deleted!\n");
     }
 }
