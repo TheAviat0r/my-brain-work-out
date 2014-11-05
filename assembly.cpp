@@ -24,6 +24,7 @@ const int bx_code = 100498;
 const int cx_code = 100497;
 const int dx_code = 100496;
 const int ex_code = 100495;
+const int fx_code = 100494;
 const int LABEL_LIM = 10;
 const int NOEXIST   = -1;
 //!==================================================================
@@ -39,7 +40,6 @@ const char str_MUL[] =      "mul";
 const char str_DIV[] =      "div";
 const char str_SQR[] =      "sqr";
 const char str_SQRT[] =     "sqrt";
-const char str_SUMUP[] =    "sumup";
 const char str_OUT[] =      "out";
 const char str_JB[] =       "jb";
 const char str_JA[] =       "ja";
@@ -146,7 +146,9 @@ void ProcessAsm(void)
         //}=======================================
 
         int comm_size = 2 * cntComm(input, output) + 1;
+        assert(comm_size != NULL);
         double * arr_comm = (double *) calloc(comm_size, sizeof(double));
+        assert(arr_comm != NULL);
         label_t arr_label[LABEL_LIM] = {};
 
         initiateLabels(arr_label);
@@ -175,6 +177,7 @@ void ProcessAsm(void)
 //!====================================
 int cntComm(FILE *input, FILE *output)
 {
+    assert(input != NULL && output != NULL);
     char command[20] = {};
     double value = 0;
     int cnt_comm = 0;
@@ -212,7 +215,7 @@ void initiateLabels(label_t arr_label[])
 //!====================================
 void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_size)
 {
-    assert(arr_comm != NULL);
+    assert(arr_comm != NULL && input != NULL && comm_size != NULL && arr_label != NULL);
     //!            INITIALIZE WORKING VARIABLES
     //{===============================================
     char command[10] = {};
@@ -235,6 +238,7 @@ void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_
         while (strcmp(command, str_END))
         {
             command_len = strlen(command);
+            assert(command_len > 0);
             if (command_len <= 1)
             {
                 printf("WRONG INPUT! COMMAND LENGTH SHOULD BE > 1\n");
@@ -348,7 +352,6 @@ void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_
             OPER(command, DIV)
             OPER(command, SQR)
             OPER(command, SQRT)
-            OPER(command, SUMUP)
             #undef OPER
             //}!============================================================
 
@@ -363,12 +366,19 @@ void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_
                     {
                         strcpy(arr_label[cnt_label].name, label_name);
 
-                        assert(cnt_label < LABEL_LIM);
-                        arr_label[cnt_label].adress = i_comm;
-                        cnt_label++;
+                        if (cnt_label < LABEL_LIM)
+                        {
+                            arr_label[cnt_label].adress = i_comm;
+                            cnt_label++;
 
-                        fscanf(input, "%s", command);
-                        continue;
+                            fscanf(input, "%s", command);
+                            continue;
+                        }
+                        else
+                        {
+                            printf("ERROR! ARRAY OF LABELS IS FULL! RECOMPILE PROGRAM\n!");
+                            exit(1488);
+                        }
                     }
 
                     fscanf(input, "%s", command);

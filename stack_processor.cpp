@@ -177,7 +177,6 @@ void processComm(void)
         fscanf(input, "%s", seek);
         if (strcmp(seek, "commands:") == NULL)
         {
-            printf("seek = <%s>\n", seek);
             fscanf(input, "%d", &num_command);
             printf("num_comm = %d\n", num_command);
 
@@ -225,7 +224,7 @@ void processComm(void)
         }
         #undef DEF_CMD
         dump_ok(&mystack);
-        //dump_call(&call_stack);
+        dump_call(&call_stack);
 
         free(mystack.buffer);
         free(call_stack.buffer);
@@ -245,240 +244,18 @@ void formCommands(FILE *input, double list_comm[], int list_size)
     printf("list_size = %d\n", list_size);
     //!            INITIALIZE WORKING VARIABLES
     //{===============================================
-    int command = 0;
-    int cnt_list = 0, position = 0;
-    int reg = 0;
-    char seek[20] = {};
-    double value = 0;
+    double command = 0;
+    int cnt_list = 0;
     //}===============================================
-    int jump_value = 0;
 
-    fscanf(input, "%d", &command);
-    printf("1st command = <%d>\n", command); SLASHES
+    fscanf(input, "%lf", &command);
+    SLASHES
     while (command != CMD_END)
     {
         //printf("cycle commmand = <%d>\n", command);
-        switch(command)
-        {
-            case 1:
-                fscanf(input, "%lf", &value);
-                //printf("push argument = <%lg>\n", value);
-
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = value;
-                //dump_Comm(input, list_comm, list_size);
-                cnt_list++;
-                break;
-            //!================================================
-            case 2:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-
-                cnt_list++;
-
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                fscanf(input, "%d", &reg);
-                #define FINDR(reg, name) if (reg == name##_code)\
-                                                list_comm[cnt_list] = name##_code;
-                FINDR(reg, ax);
-                FINDR(reg, bx);
-                FINDR(reg, cx);
-                FINDR(reg, dx);
-                FINDR(reg, ex);
-                FINDR(reg, fx);
-                #undef FINDR
-
-                cnt_list++;
-                break;
-            //!================================================
-            case 3:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                fscanf(input, "%d", &reg);
-                #define FINDR(reg, name) if (reg == name##_code)\
-                                                list_comm[cnt_list] = name##_code;
-                FINDR(reg, ax);
-                FINDR(reg, bx);
-                FINDR(reg, cx);
-                FINDR(reg, dx);
-                FINDR(reg, ex);
-                FINDR(reg, fx);
-                #undef FINDR
-                cnt_list++;
-
-                break;
-            //!================================================
-            case 4:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-
-                list_comm[cnt_list] = command;
-                cnt_list++;
-                break;
-            //!================================================
-            case 5:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-                break;
-            //!================================================
-            case 6:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                fscanf(input, "%d", &position);
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = position;
-                cnt_list++;
-                break;
-            //!================================================
-            case 7:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-                break;
-            //!================================================
-            case 8:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-                break;
-            //!================================================
-            case 9:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-                break;
-            //!================================================
-            case 10:
-                //printf("this is out!\n");
-                //dump_Comm(input, list_comm, list_size);
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-                break;
-            //!================================================
-            case 11:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                fscanf(input, "%d", &reg);
-                #define FINDR(reg, name) if (reg == name##_code)\
-                                                list_comm[cnt_list] = name##_code;
-                FINDR(reg, ax);
-                FINDR(reg, bx);
-                FINDR(reg, cx);
-                FINDR(reg, dx);
-                FINDR(reg, ex);
-                FINDR(reg, fx);
-                #undef FINDR
-                cnt_list++;
-                break;
-            //!================================================
-            case 12:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-                break;
-            //!================================================
-            case 13:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                fscanf(input, "%d", &jump_value);
-                list_comm[cnt_list] = jump_value;
-                cnt_list++;
-                break;
-            //!================================================
-            case 14:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                fscanf(input, "%d", &jump_value);
-                list_comm[cnt_list] = jump_value;
-                cnt_list++;
-                break;
-            //!================================================
-            case 15:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                fscanf(input, "%d", &jump_value);
-                list_comm[cnt_list] = jump_value;
-                cnt_list++;
-                break;
-            //!================================================
-            case 16:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                fscanf(input, "%d", &jump_value);
-                list_comm[cnt_list] = jump_value;
-                cnt_list++;
-                break;
-            //!================================================
-            case 17:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                fscanf(input, "%d", &jump_value);
-                list_comm[cnt_list] = jump_value;
-                cnt_list++;
-                break;
-            //!================================================
-            case 18:
-                assert(0 <= cnt_list && cnt_list <= list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                fscanf(input, "%d", &jump_value);
-                list_comm[cnt_list] = jump_value;
-                cnt_list++;
-                break;
-            //!================================================
-            case 100500:
-                list_comm[cnt_list] = command;
-                break;
-            //!================================================
-            case 1337:
-                assert (0 <= cnt_list && cnt_list < list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-
-                assert (0 <= cnt_list && cnt_list < list_size);
-                fscanf(input, "%d", &jump_value);
-                list_comm[cnt_list] = jump_value;
-                cnt_list++;
-                break;
-            case 1488:
-                assert (0 <= cnt_list && cnt_list < list_size);
-                list_comm[cnt_list] = command;
-                cnt_list++;
-                break;
-            default:
-                printf("WRONG COMMAND! Unable to process creating array of commands!\n");
-                printf("command = %d\n", command);
-                dump_Comm(input, list_comm, list_size, cnt_list);
-                exit(1);
-                break;
-        }
-        fscanf(input, "%d", &command);
         list_comm[cnt_list] = command;
+        cnt_list++;
+        fscanf(input, "%lf", &command);
     }
 
     list_comm[cnt_list] = CMD_END;
@@ -505,22 +282,6 @@ void dump_Comm(FILE *input, double list_comm[], int list_size, int position)
     printf("list_size = <%d>\n", list_size);
     SLASHES;
 
-    /*printf("CMD_NUM: ");
-    for (int i = 0; i < list_size; ++i)
-    {
-        assert(0 <= i && i < list_size);
-        printf("<%lg> ", list_comm[i]);
-        if (i/10 == 1 || i/10 == 2 || i/10 == 3)
-        {
-            printf("\n         ");
-            for (int k = 0; k < 10; k++)
-            {
-                assert(0 <= k && k < 10);
-                printf("[%d] ", k);
-            }
-            printf("\n");
-        }
-    }*/
     EMPT
     for (int i = 0; i < list_size; ++i)
     {
@@ -549,14 +310,12 @@ void pushCall(label_t *work, int call_point)
     assert_call(call_ok(work) == NULL);
     if (work->freemem > 0)
     {
-        printf("I PUSH CALL_POINT!!!\n");
         *(work->buffer + work->cnt)= call_point;
         work->freemem--;
         work->cnt++;
     }
     else
     {
-        printf("I PUSH CALL_POINT WITH MEM!!\n");
         ctor(work);
         work->buffer[work->cnt]= call_point;
         work->freemem--;
@@ -874,12 +633,6 @@ void showData(stack_t *work)
         printf("b[%d] = <%lg>\n", i, work->buffer[i]);
     }
     SLASHES;
-}
-//!===========================================
-void resData(stack_t *work)
-{
-    assert(stack_ok(work) == NULL);
-    printf("\t<%lg>\n", popData(work));
 }
 //!===========================================
 void sumData(stack_t *work)
