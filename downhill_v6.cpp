@@ -35,7 +35,12 @@ enum Descriptor_t
     NEQ = 17,
     FUNC = 18,
     ARG = 19,
-    BOP = 20
+    BOP = 20,
+    CALLFUNC = 21,
+    RETURN = 22,
+    ERROR = 23,
+    SHOW = 24,
+    OUT = 25
 };
 //!------------------------------------------
 const int STRLIM = 100;
@@ -77,6 +82,18 @@ struct VariableArr_t
     unsigned int cnt;
 };
 //!------------------------------------------
+struct Func_t
+{
+    char name[STRLIM];
+    char arg[STRLIM];
+};
+//!------------------------------------------
+struct FuncArr_t
+{
+    Func_t func[STRLIM];
+    unsigned int cnt;
+};
+//!------------------------------------------
 const int BEGIN = 0;
 const int TRUE = 1;
 const int FALSE = 0;
@@ -90,6 +107,10 @@ const char PREFIX[] = "tipa";
 char IFSTR[] = "if";
 char WHILESTR[] = "poka";
 const char FUNC_STR[] = "func";
+const char DECLARE_STR[] = "declare";
+const char MAIN_STR[] = "main";
+const char RETURN_STR[] = "return";
+const char SHOW_STR[] = "show";
 const char ja[] = "ja";
 const char jac[] = "jac";
 const char jb[] = "jb";
@@ -104,11 +125,14 @@ unsigned int node_amount = 0;
 unsigned int skip_num = 0;
 unsigned int if_num = 0;
 unsigned int while_num = 0;
+unsigned int func_num = 0;
+unsigned int func_skip = 0;
 //!------------------------------------------
 //}
 char * buffer = 0;
 lexem_arr_t Lexems = {};
 VariableArr_t Variables = {};
+FuncArr_t Functions = {};
 //!------------------------------------------
 void greeting();
 void processTask();
@@ -129,10 +153,15 @@ void processTask();
     void FinishWork(FILE *input, FILE *output, FILE *dump, FILE *viewTree,
                                                FILE *lex_dump, treeElem_t *root);
     int searchVar(char word[]);
+    int searchFunc(char word[]);
     void dumpVariables(FILE *output);
     //!-------- DOWNHILL FUNCS --------------
+    void getDeclarations();
+        void dumpDeclarations();
+    treeElem_t * getStart();
     treeElem_t * getProg();
     treeElem_t * getFunc();
+    treeElem_t * getCallFunc();
     treeElem_t * getOP();
     treeElem_t * getWhile();
     treeElem_t * getIF();
@@ -155,9 +184,11 @@ void processTask();
     //!--------------------------------------
     void dumpTree(treeElem_t *node, const unsigned int mode, int depth, FILE *output);
     void printElem(const unsigned int mode, treeElem_t *node, const int depth, FILE *output);
+    void printFuncNode(treeElem_t *node, FILE *output);
     void printNode(treeElem_t *node, FILE *output);
     void printUnderNode(treeElem_t *node, FILE *output);
     void printTab (const int depth, FILE *output);
+
 
 int main()
 {
@@ -185,7 +216,7 @@ void processTask()
     formLexems();
     dumpLexems(lex_dump);
 
-    treeElem_t * tree = getProg();
+    treeElem_t * tree = getStart();
     ASSERT_OK(tree);
 
     if (Lexems.data[cnt_lex].Descriptor || Lexems.warn)
@@ -208,7 +239,7 @@ void processTask()
     {
         dumpTree(tree, NODEBUG, BEGIN, viewTree);
         dumpTree(tree, DEBUG, BEGIN, dump);
-        printNode(tree, output);
+        printFuncNode(tree, output);
     }
 
     FinishWork(input, output, dump, viewTree, lex_dump, tree);
@@ -480,6 +511,39 @@ void FinishWork(FILE *input, FILE *output,  FILE *dump, FILE *viewTree,
 //!-----------------------------------------
 //!           TREE FUNCTIONS
 //!-----------------------------------------
+void printFuncNode(treeElem_t *node, FILE * output)
+{
+    assert(node);
+    assert(output);
+    ASSERT_OK(node);
+
+    if (node->left && node->left->left && node->left->right)
+    {
+        treeElem_t * FuncCode = node->left->left;
+        treeElem_t * FuncArgs = node->left->right;
+        treeElem_t * theFunc = node->left;
+
+        if (strcmp(theFunc->oper, MAIN_STR) == NULL)
+            fprintf(output, "call f_skip0\n");
+
+        fprintf(output, "jmp f_skip%u\n\n", func_skip);
+        fprintf(output, "func%d:\n", func_num);
+
+        if (strlen(FuncArgs->oper))
+            fprintf(output, "pop %s\n", FuncArgs->oper);
+
+        printNode(FuncCode, output);
+
+        fprintf(output, "ret\n");
+        fprintf(output, "\nf_skip%u:\n", func_skip);
+        func_num++;
+        func_skip++;
+    }
+
+    if (node->right)
+        printFuncNode(node->right, output);
+}
+//!-----------------------------------------
 void printNode(treeElem_t *node, FILE *output)
 {
     assert(node);
@@ -749,6 +813,13 @@ void printElem(const unsigned int mode, treeElem_t *node, const int depth, FILE 
                 TAB fprintf(output, "FUNC\n");
                 TAB fprintf(output, "%s\n", node->oper);
                 break;
+            case CALLFUNC:
+                TAB fprintf(output, "CALLFUNC\n");
+                TAB fprintf(output, "%s\n", node->oper);
+                break;
+            case RETURN:
+                TAB fprintf(output, "RETURN\n");
+                break;
             case ARG:
                 if (strlen(node->oper))
                 {
@@ -764,6 +835,18 @@ void printElem(const unsigned int mode, treeElem_t *node, const int depth, FILE 
                 break;
             case BOP:
                 TAB fprintf(output, "BOP\n");
+                break;
+            case ERROR:
+                TAB fprintf(output, "ERROR!!!\n");
+                break;
+            case SHOW:
+                TAB fprintf(output, "SHOW\n");
+                break;
+            case OUT:
+                TAB fprintf(output, "OUT\n");
+                break;
+            default:
+                printf("ERROR! %u Descriptor doesn't exist!\n", node->type);
                 break;
         }
     }
@@ -808,16 +891,19 @@ void dumpTree(treeElem_t *node, const unsigned int mode, int depth, FILE *output
 //!-----------------------------------------
 int treeOk(treeElem_t *root, unsigned int counter)
 {
-    assert(root);
+    if (Lexems.warn == FALSE)
+    {
+        assert(root);
 
-    if (counter > node_amount)
-        return 1;
-    counter++;
+        if (counter > node_amount)
+            return 1;
+        counter++;
 
-    if (root->left)
-        treeOk(root->left, counter);
-    if (root->right)
-        treeOk(root->right, counter);
+        if (root->left)
+            treeOk(root->left, counter);
+        if (root->right)
+            treeOk(root->right, counter);
+    }
 
     return 0;
 }
@@ -879,6 +965,22 @@ int searchVar(char word[])
     return NOEXIST;
 }
 //!-----------------------------------------
+int searchFunc(char word[])
+{
+    assert(word);
+    assert(Functions.func);
+    assert(Functions.cnt <= VARLIM);
+
+    for (int i = 0; i <= Functions.cnt; i++)
+    {
+        assert(0 <= i && i <= Functions.cnt);
+        if (!strcmp(word, Functions.func[i].name))
+            return i;
+    }
+
+    return NOEXIST;
+}
+//!-----------------------------------------
 void dumpVariables(FILE * output)
 {
     assert(output);
@@ -925,7 +1027,11 @@ treeElem_t * getVar()
     if (Lexems.data[cnt_lex].Descriptor == VAR && Lexems.warn == FALSE)
     {
         tree = ctor(NULL, NULL, VAR, NULL, NULL);
-        ASSERT_OK(tree);
+        if (Lexems.data[cnt_lex + 1].oper[0] == '(')
+        {
+            tree = getCallFunc();
+            return tree;
+        }
 
         if (searchVar(Lexems.data[cnt_lex].oper) != NOEXIST)
             strcpy(tree->oper, Lexems.data[cnt_lex].oper);
@@ -949,14 +1055,70 @@ treeElem_t * getVar()
     return tree;
 }
 //!------------------------------------------
-treeElem_t * getProg()
+treeElem_t * getShow()
 {
     assert(Lexems.data);
     assert(cnt_lex <= Lexems.cnt);
 
+    treeElem_t * ShowCommand = ctor(0, 0, SHOW, NULL, NULL);
+
+    if (Lexems.data[cnt_lex].Descriptor == VAR)
+    {
+        if (strcmp(Lexems.data[cnt_lex].oper, SHOW_STR) == NULL)
+        {
+            cnt_lex++;
+            ShowCommand->left = getVar();
+
+            if (Lexems.data[cnt_lex].oper[0] != ';')
+            {
+                printf("ERROR! ';' is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+                Lexems.warn = TRUE;
+                return ShowCommand;
+            }
+
+            cnt_lex++;
+            return ShowCommand;
+        }
+        else
+        {
+            printf("ERROR! error in show command!\n");
+            Lexems.warn = TRUE;
+            return ShowCommand;
+        }
+    }
+    else
+    {
+        printf("ERROR! in show command in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+        Lexems.warn = TRUE;
+        return NULL;
+    }
+}
+//!------------------------------------------
+treeElem_t * getStart()
+{
+    assert(Lexems.data);
+    assert(cnt_lex <= Lexems.cnt);
+
+    getDeclarations();
+    treeElem_t * Start = (treeElem_t *) calloc(1, sizeof(treeElem_t));
+    Start = getProg();
+
+    if (strcmp(Start->left->oper, MAIN_STR))
+    {
+        printf("ERROR! 'main' function should be 1st!\n");
+        printf("%s\n", Start->left->oper);
+        Lexems.warn = TRUE;;
+    }
+    return Start;
+}
+//!------------------------------------------
+treeElem_t * getProg()
+{
+    assert(Lexems.data);
+    assert(cnt_lex <= Lexems.cnt);
     treeElem_t * theProg = ctor(0, 0, BOP, getFunc(), NULL);
 
-    while(cnt_lex < Lexems.cnt)
+    while(cnt_lex < Lexems.cnt && Lexems.warn == FALSE)
     {
         treeElem_t * nextFunc = getProg();
         theProg->right = nextFunc;
@@ -972,6 +1134,7 @@ treeElem_t * getFunc()
 
     if (Lexems.data[cnt_lex].Descriptor == VAR)
     {
+
         if (strcmp(Lexems.data[cnt_lex].oper, FUNC_STR) == NULL)
         {
             cnt_lex++;
@@ -979,6 +1142,12 @@ treeElem_t * getFunc()
 
             if (Lexems.data[cnt_lex].Descriptor == VAR)
             {
+                if (searchFunc(Lexems.data[cnt_lex].oper) == NOEXIST)
+                {
+                    printf("Function '%s' in stroke %u doesn't exist!\n", Lexems.data[cnt_lex].oper, Lexems.data[cnt_lex].stroke);
+                    Lexems.warn = TRUE;
+                    return Func;
+                }
                 strcpy(Func->oper, Lexems.data[cnt_lex].oper);
                 cnt_lex++;
             }
@@ -986,7 +1155,6 @@ treeElem_t * getFunc()
             {
                 printf("Unable to create Func! Wrong name type in stroke <%d>\n", Lexems.data[cnt_lex].stroke);
                 Lexems.warn == TRUE;
-                return NULL;
             }
 
             if (Lexems.data[cnt_lex].oper[0] == '(')
@@ -997,6 +1165,8 @@ treeElem_t * getFunc()
                 if (Lexems.data[cnt_lex].Descriptor == VAR)
                 {
                     strcpy(arg_name, Lexems.data[cnt_lex].oper);
+                    strcpy(Variables.Var[Variables.cnt].name , Lexems.data[cnt_lex].oper);
+                    Variables.cnt++;
                     cnt_lex++;
                 }
 
@@ -1016,6 +1186,142 @@ treeElem_t * getFunc()
             }
         }
     }
+}
+//!------------------------------------------
+treeElem_t * getCallFunc()
+{
+    assert(Lexems.data);
+    assert(cnt_lex <= Lexems.cnt);
+
+    if (Lexems.data[cnt_lex].Descriptor == VAR && Lexems.warn == FALSE)
+    {
+        if (searchFunc(Lexems.data[cnt_lex].oper) == NOEXIST)
+        {
+            printf("ERROR! Function '%s' doesn't exist!\n", Lexems.data[cnt_lex].oper);
+            Lexems.warn = TRUE;
+            return NULL;
+        }
+
+        treeElem_t * CallFunc = ctor(0, Lexems.data[cnt_lex].oper, CALLFUNC, NULL, NULL);
+        cnt_lex++;
+        if (Lexems.data[cnt_lex].oper[0] == '(')
+        {
+            cnt_lex++;
+            CallFunc->left = getAdd();
+            if (Lexems.data[cnt_lex].oper[0] == ')')
+            {
+                cnt_lex++;
+                return CallFunc;
+            }
+            else
+            {
+                printf("ERROR! ')' is missing in stroke (%u)\n", Lexems.data[cnt_lex].stroke);
+                Lexems.warn == TRUE;
+                return CallFunc;
+            }
+        }
+    }
+
+    return ctor(0, 0, ERROR, NULL, NULL);
+}
+//!------------------------------------------
+treeElem_t * getFuncReturn()
+{
+    assert(Lexems.data);
+    assert(Functions.func);
+
+    cnt_lex++;
+    treeElem_t * theReturn =  ctor(0, 0, RETURN, getAdd(), NULL);
+    if (Lexems.data[cnt_lex].oper[0] != ';')
+    {
+        printf("';' is missing in stroke %u!\n", Lexems.data[cnt_lex].oper);
+        Lexems.warn = TRUE;
+    }
+    cnt_lex++;
+
+    return theReturn;
+}
+//!------------------------------------------
+void getDeclarations()
+{
+    assert(Lexems.data);
+    assert(cnt_lex <= Lexems.cnt);
+    assert(Functions.func);
+
+    while (strcmp(Lexems.data[cnt_lex].oper, FUNC_STR))
+    {
+        if (strcmp(Lexems.data[cnt_lex].oper, DECLARE_STR) == NULL)
+        {
+            cnt_lex++;
+            char func_name[STRLIM] = {};
+
+            if(strcmp(Lexems.data[cnt_lex].oper, FUNC_STR))
+            {
+                strcpy(Functions.func[Functions.cnt].name, Lexems.data[cnt_lex].oper);
+                cnt_lex++;
+
+                if (Lexems.data[cnt_lex].oper[0] ==  '(')
+                {
+                    cnt_lex++;
+                    if (Lexems.data[cnt_lex].Descriptor == VAR)
+                    {
+                        strcpy(Functions.func[Functions.cnt].arg, Lexems.data[cnt_lex].oper);
+                        strcpy(Variables.Var[Variables.cnt].name, Lexems.data[cnt_lex].oper);
+                        cnt_lex++;
+                        Functions.cnt++;
+                        Variables.cnt++;
+                    }
+
+                    if (Lexems.data[cnt_lex].oper[0] == ')')
+                    {
+                        cnt_lex++;
+                        if (Lexems.data[cnt_lex].oper[0] == ';')
+                            cnt_lex++;
+                        else
+                        {
+                            Lexems.warn = TRUE;
+                            printf("; is missing in stroke %u\n", Lexems.data[cnt_lex].stroke);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        Lexems.warn = TRUE;
+                        printf(") is missing in stroke %u\n", Lexems.data[cnt_lex].stroke);
+                        break;
+                    }
+                }
+                else
+                {
+                    printf("( is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+                    break;
+                }
+            }
+
+        }
+        else
+        {
+            printf("Mistake in declaration in stroke %u\n", Lexems.data[cnt_lex].stroke);
+            Lexems.warn = TRUE;
+            return;
+        }
+    }
+
+    dumpDeclarations();
+    //dumpVariables(stdout);
+}
+//!------------------------------------------
+void dumpDeclarations()
+{
+    assert(Functions.func);
+    assert(Functions.cnt >= 0);
+
+    SLASHES printf("\t FUNCTIONS DECLARE DUMP\n");
+    for (int i = 0; i < Functions.cnt; i++)
+    {
+        assert(0 <= i && i < Functions.cnt);
+        SLASHES printf("%d) func <%s> arg (%s)\n", i, Functions.func[i].name, Functions.func[i].arg);
+    } SLASHES EMPT
 }
 //!------------------------------------------
 treeElem_t * getOP()
@@ -1042,15 +1348,12 @@ treeElem_t * getSkob()
     {
         cnt_lex++;
 
-        printf("{ is spotted!\n");
-
         treeElem_t * tree = ctor(0, 0, OP, getOP(), NULL);
         ASSERT_OK(tree);
 
 
         if (Lexems.data[cnt_lex].oper[0] == '}' )
         {
-            printf("} is spotted!\n");
             cnt_lex++;
             return tree;
         }
@@ -1058,7 +1361,7 @@ treeElem_t * getSkob()
         {
             if (Lexems.warn == FALSE)
             {
-                SLASHES printf("ERROR! } is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+                SLASHES printf("ERROR! '}' is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
                 printf("(%s)\n", Lexems.data[cnt_lex].oper);
                 Lexems.warn = TRUE;
             }
@@ -1069,12 +1372,20 @@ treeElem_t * getSkob()
     {
         if (Lexems.data[cnt_lex].Descriptor == VAR)
         {
+            //printf("this is Skob simple case %u\n", Lexems.data[cnt_lex].stroke);
             if (strcmp(Lexems.data[cnt_lex].oper, "while") == NULL)
                 return getWhile();
             if (strcmp(Lexems.data[cnt_lex].oper, "if") == NULL)
                 return getIF();
             if (Lexems.data[cnt_lex].Descriptor == VAR)
-                return getRav();
+            {
+                if (strcmp(Lexems.data[cnt_lex].oper, RETURN_STR) == NULL)
+                    return getFuncReturn();
+                if (strcmp(Lexems.data[cnt_lex].oper, SHOW_STR) == NULL)
+                    return getShow();
+
+                    return getRav();
+            }
 
             Lexems.warn = TRUE;
             return NULL;
@@ -1118,7 +1429,7 @@ treeElem_t * getIF()
         {
             if (Lexems.warn == FALSE)
             {
-                printf(") is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+                printf("')' is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
                 Lexems.warn = TRUE;
             }
             return cond;
@@ -1126,7 +1437,7 @@ treeElem_t * getIF()
     }
     else
     {
-        printf("( is missing in stroke %u\n", Lexems.data[cnt_lex].stroke);
+        printf("'(' is missing in stroke %u\n", Lexems.data[cnt_lex].stroke);
         Lexems.warn = TRUE;
         return NULL;
     }
@@ -1228,7 +1539,7 @@ treeElem_t * getRav()
             }
             else
             {
-                printf("ERROR! Redefenition of %s in stroke %U!\n", Lexems.data[cnt_lex].oper, Lexems.data[cnt_lex].stroke);
+                printf("ERROR! Redefenition of %s in stroke %u!\n", Lexems.data[cnt_lex].oper, Lexems.data[cnt_lex].stroke);
                 Lexems.warn = TRUE;
                 return NULL;
             }
@@ -1244,6 +1555,12 @@ treeElem_t * getRav()
                 cnt_lex++;
                 Variable = ctor(0, "=", ASSIG, getAdd(), Variable);
                 ASSERT_OK(Variable);
+            }
+            else
+            {
+                printf("ERROR! '=' is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+                Lexems.warn = TRUE;
+                return Variable;
             }
 
             if (Lexems.data[cnt_lex].oper[0] != ';' && Lexems.warn == FALSE)
