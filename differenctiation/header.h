@@ -17,7 +17,7 @@
 #define CUR_SYMB  Lexems.data[cnt_lex].oper[0]
 #define CUR_NUM   Lexems.data[cnt_lex].data
 //!-------------------------------------------
-#define D(name) diffFunc(name)
+#define D(name) diffFunc(name, varD, output)
 #define LEFT root->left
 #define RIGHT root->right
 #define COPY(name) copyTree(name)
@@ -69,6 +69,8 @@ const char Opers[7] = {'+', '-', '*', '/', '^', '(', ')'};
 //!-------------------------------------------
 const int STRLIM = 100;
 const int VARLIM = 100;
+const int STRDUMPLIM = 1000;
+const int PHRLIM = 25;
 //!-------------------------------------------
 struct lexem_t
 {
@@ -94,6 +96,25 @@ struct lexem_arr_t
     unsigned int warn;
 };
 //!-------------------------------------------
+struct rules_t
+{
+    unsigned int sin;
+    unsigned int cos;
+    unsigned int mul;
+    unsigned int add;
+    unsigned int sub;
+    unsigned int div;
+    unsigned int exp;
+    unsigned int ln;
+    unsigned int pow;
+};
+//!-------------------------------------------
+struct G_Variables_t
+{
+    char data[10];
+    unsigned int cnt;
+};
+//!-------------------------------------------
 const int BEGIN = 0;
 const int TRUE = 1;
 const int FALSE = 0;
@@ -113,11 +134,12 @@ unsigned int cnt = 0;
 unsigned int cnt_lex = 0;
 unsigned int flen = 0;
 unsigned int node_amount = 0;
-treeElem_t * treeHead = NULL;
-int isSkobka = 0;
 //!------------------------------------------
 char * buffer = 0;
+//!------------------------------------------
 lexem_arr_t Lexems = {};
+G_Variables_t G_Var = {};
+rules_t G_rules = {};
 //!------------------------------------------
 void greeting();
 void processTask();
@@ -134,8 +156,8 @@ void processTask();
         void dumpLexems(FILE *output);
         void resizeLexems();
     FILE *openFile(char file_name[]);
-    void FinishWork(FILE *input, FILE *output, FILE *dump, FILE *viewTree,
-                                               FILE *lex_dump, treeElem_t *root);
+    void FinishWork(FILE *input, FILE *dump, FILE *viewTree,
+                                               FILE *lex_dump, treeElem_t *root, FILE *viewDiff);
     //!--------------------------------------
     //!         DOWNHILL FUNCS
     //!--------------------------------------
@@ -152,9 +174,13 @@ void processTask();
     void dtor(treeElem_t *work);
     treeElem_t *copyTree(treeElem_t *root);
     int treeOk(treeElem_t *root, unsigned int counter);
+    //!--------------------------------------
+    void CountVars(treeElem_t *root);
+    int searchVar(treeElem_t *root);
     void destroyTree(treeElem_t *root);
     void optimizeTree(treeElem_t *root);
-    treeElem_t *diffFunc(treeElem_t *root);
+    void processMultDiff(treeElem_t *tree, FILE *output);
+    treeElem_t * diffFunc(treeElem_t *root, char varD, FILE*output);
     void cutConst(treeElem_t *root);
     void foldMul(treeElem_t *root);
     void foldDiv(treeElem_t *root);
@@ -165,7 +191,10 @@ void processTask();
     //!--------------------------------------
     void dumpTree(treeElem_t *node, const unsigned int mode, int depth, FILE *output);
     void dumpTex(treeElem_t *root, treeElem_t *parent, FILE * output);
-    void printTex(treeElem_t *root_func, treeElem_t *root, FILE *output);
+    void printIntro(treeElem_t *root_func, FILE *output);
+    void printDiff(treeElem_t *root, char varD, FILE *output);
+    void finishDiff(treeElem_t *root, char varD, FILE *output);
+    void finishTex(treeElem_t *root[], FILE *output);
     void printElem(const unsigned int mode, treeElem_t *node, const int depth, FILE *output);
     void printNode(treeElem_t *node, FILE *output);
     void printTab (const int depth, FILE *output);

@@ -37,7 +37,6 @@ void processTask()
         SLASHES EMPT
     }
 
-    FILE *output = openFile("commands.txt");
     FILE *dump = openFile("dump.txt");
     FILE *viewTree = openFile("tree.txt");
     FILE *viewDiff = openFile("Final.tex");
@@ -45,23 +44,58 @@ void processTask()
     if (Lexems.warn == FALSE)
     {
         optimizeTree(tree);
-        dumpTree(tree, NODEBUG, BEGIN, stdout);
+        dumpTree(tree, NODEBUG, BEGIN, viewTree);
         dumpTree(tree, DEBUG, BEGIN, dump);
 
-        EMPT SLASHES
+        processMultDiff(tree, viewDiff);/*EMPT SLASHES
+        char varD = 0;
+        CountVars(tree);
+        printf("Vars are counted! Amount = %u\n", G_Var.cnt);
 
-        treeElem_t * D_Func = diffFunc(tree);
-        SLASHES printf("NON-OPTIMIZED!\n");
-        dumpTree(D_Func, NODEBUG, BEGIN, stdout);
-        SLASHES printf("OPTIMIZED!\n");
-        optimizeTree(D_Func);
-        dumpTree(D_Func, NODEBUG, BEGIN, stdout);
-        printTex(tree, D_Func, viewDiff);
+        printIntro(tree, viewDiff);
+
+        treeElem_t *D_arr[10] = {};
+        for (int i = 0; i < G_Var.cnt; i++)
+        {
+            printDiff(tree, G_Var.data[i], viewDiff);
+            D_arr[i] = diffFunc(tree, G_Var.data[i],viewDiff);
+            optimizeTree(D_arr[i]);
+            finishDiff(D_arr[i], G_Var.data[i], viewDiff);
+        }*/
+
+        //SLASHES printf("NON-OPTIMIZED!\n");
+        //dumpTree(D_Func, NODEBUG, BEGIN, stdout);
+        //SLASHES printf("OPTIMIZED!\n");
+        //optimizeTree(D_Func);
+        //finishTex(D_arr[0], viewDiff);
+        //(D_Func, NODEBUG, BEGIN, stdout);
     }
 
-   FinishWork(input, output, dump, viewTree, lex_dump, tree);
+    //system("commands.bat");
+    FinishWork(input, dump, viewTree, lex_dump, tree, viewDiff);
 }
 //!------------------------------------------
+void processMultDiff(treeElem_t *tree, FILE *output)
+{
+    assert(tree);
+    assert(output);
+
+    CountVars(tree);
+    printf("Vars are counted! Amount = %u\n", G_Var.cnt);
+
+    printIntro(tree, output);
+
+    treeElem_t *D_arr[10] = {};
+    for (int i = 0; i < G_Var.cnt; i++)
+    {
+        printDiff(tree, G_Var.data[i], output);
+        D_arr[i] = diffFunc(tree, G_Var.data[i],output);
+        optimizeTree(D_arr[i]);
+        finishDiff(D_arr[i], G_Var.data[i], output);
+    }
+
+    finishTex(D_arr, output);
+}
 FILE * formBuffer()
 {
     FILE *input = fopen("input_task.txt", "r");
@@ -240,22 +274,21 @@ FILE *openFile(char file_name[])
     return workFile;
 }
 //!-----------------------------------------
-void FinishWork(FILE *input, FILE *output,  FILE *dump, FILE *viewTree,
-                                            FILE * lex_dump, treeElem_t *root)
+void FinishWork(FILE *input,  FILE *dump, FILE *viewTree,
+                                            FILE * lex_dump, treeElem_t *root, FILE * viewDiff)
 {
     assert(input);
-    assert(output);
     assert(dump);
     assert(lex_dump);
     assert(viewTree);
     assert(buffer);
+    assert(viewDiff);
     assert(root);
 
     EMPT SLASHES printf("Work is finished!\n"); SLASHES
-    fprintf(output, "end");
+    fprintf(viewDiff, "\\end{document}\n");
 
     fclose(input);
-    fclose(output);
     fclose(dump);
     fclose(viewTree);
     fclose(lex_dump);
@@ -380,7 +413,7 @@ void dumpTex(treeElem_t *root, treeElem_t *parent, FILE *output)
             fprintf(output, "\\dfrac{");
             break;
         case MUL:
-            if (parent)
+        if (parent && (parent->type != ADD && parent->type != SUB && parent->type != MUL))
                 if (LEFT->type == ADD || LEFT->type == SUB || RIGHT->type == ADD || RIGHT->type == SUB)
                 {
                     printf("prefix mul!\n");
@@ -389,7 +422,7 @@ void dumpTex(treeElem_t *root, treeElem_t *parent, FILE *output)
 
             break;
         case POW:
-            if (LEFT->type == ADD || LEFT->type == SUB || LEFT->type == MUL || LEFT->type == DIV)
+            if (LEFT->type == ADD || LEFT->type == SUB || LEFT->type == MUL || LEFT->type == DIV || LEFT->type == POW)
                 fprintf(output, "(");
             break;
         case ADD:
@@ -436,6 +469,8 @@ void dumpTex(treeElem_t *root, treeElem_t *parent, FILE *output)
             fprintf(output, "}{");
             break;
         case POW:
+            if (LEFT->type == POW)
+                fprintf(output, ")");
             fprintf(output, "^{");
             break;
     }
@@ -443,13 +478,13 @@ void dumpTex(treeElem_t *root, treeElem_t *parent, FILE *output)
     if (root->right)
         dumpTex(root->right, root, output);
 
-    if (root->type == SIN || root->type == COS || root->type == EXP || root->type == LN)
+    if (root->type == SIN || root->type == COS || root->type == LN)
         fprintf(output, ")");
 
-    if (root->type == DIV || root->type == POW)
+    if (root->type == POW || root->type == EXP || root->type == DIV)
         fprintf(output, "}");
 
-    if (root->type == MUL && parent)
+    if (root->type == MUL && parent && (parent->type != ADD && parent->type != SUB && parent->type != MUL))
     {
         if (LEFT->type == ADD || LEFT->type == SUB || RIGHT->type == ADD || RIGHT->type == SUB)
         {
@@ -461,15 +496,15 @@ void dumpTex(treeElem_t *root, treeElem_t *parent, FILE *output)
         }
     }
 
-    if ((root->type == ADD || root->type == SUB) && parent && (parent->type == MUL || parent->type == DIV ||
-                                                               parent->type == POW))
+    if ((root->type == ADD || root->type == SUB) && parent &&
+            (parent->type == MUL || parent->type == DIV || (parent->type == POW && parent->left == root)))
     {
         printf ("postfix add skob!\n");
         fprintf(output, ")");
     }
 }
 //!------------------------------------------
-void printTex(treeElem_t *root_func, treeElem_t *root, FILE *output)
+void printIntro(treeElem_t *root_func, FILE *output)
 {
     FILE *prefix = fopen("title.txt", "r");
 
@@ -483,16 +518,106 @@ void printTex(treeElem_t *root_func, treeElem_t *root, FILE *output)
         fprintf(output, "%c", buff[i]);
         i++;
     }
+}
+//!------------------------------------------
+void printDiff(treeElem_t *root, char varD, FILE * output)
+{
+    fprintf(output, "\\section*{Производная следующей функции по %c:}\n", varD);
+    fprintf(output, "\\begin{center}\n$f(");
+    fprintf(output, "%c", G_Var.data[0]);
 
-    fprintf(output, "$$ f(x) = ");
-    dumpTex(root_func, NULL,  output);
-    fprintf(output, "$$\n");
+    for (int i = 1; i < G_Var.cnt; i++)
+    {
+        assert(1 <= i && i <= G_Var.cnt);
+        fprintf(output, ",%c", G_Var.data[i]);
+    }
 
-    fprintf(output, "\\begin{center} Очевидно, что $f^{\\prime} (x) = ");
+    fprintf(output, ") = ");
+    dumpTex(root, NULL,  output);
+    fprintf(output, "$\n\\end{center}\n");
+
+    fprintf(output, "На этом тривиальном примере наглядно покажем практическую реализацию правил дифференцирования\n");
+    fprintf(output, "\\section*{Взятие производной по %c}\n", varD);
+    fprintf(output, "Продифференцируем нашу функцию по %c. Будем пользоваться стандартными правилами.\n", varD);
+}
+//!------------------------------------------
+void finishDiff(treeElem_t *root, char varD, FILE * output)
+{
+    assert(root);
+    assert(varD);
+    assert(output);
+
+    fprintf(output, "\\section*{Результат по %c}\n", varD);
+    fprintf(output, "В итоге имеем:\n");
+    fprintf(output, "\\\\*$ f ^{\\prime}(%c) = ", varD);
     dumpTex(root, NULL, output);
-    fprintf(output, "$\\end{center}\n");
+    fprintf(output, "$");
+}
+//!------------------------------------------
+void finishTex(treeElem_t *root[], FILE *output)
+{
+    assert(root);
+    assert(output);
+    fprintf(output, "\n\\section*{Финальная стадия - полная производная:}\n");
+    fprintf(output, "Полная производная есть квадратный корень из суммы всех квадратов частных производных. Найдем ее\n");
+    fprintf(output, "\\begin{center}\n$F^{\\prime}(");
+    fprintf(output, "%c", G_Var.data[0]);
 
-    fprintf(output, "\\end{document}\n");
+    for (int i = 1; i < G_Var.cnt; i++)
+    {
+        assert(1 <= i && i <= G_Var.cnt);
+        fprintf(output, ",%c", G_Var.data[i]);
+    }
+
+    fprintf(output, ") = \\sqrt{");
+    for (int i = 0; i < G_Var.cnt; i++)
+    {
+        assert(0 <= i && i <= G_Var.cnt);
+        fprintf(output, "(");
+        dumpTex(root[i], NULL, output);
+        fprintf(output, ")^2");
+
+        if (i != G_Var.cnt - 1)
+            fprintf(output, "+");
+    }
+    fprintf(output, "}$\n\\end{center}\n");
+
+
+    fprintf(output, "\n\\section*{Использованная литература}\n");
+    fprintf(output, "\\textbf{1)} Больное воображение автора программы\n");
+    fprintf(output, "\\\\* \\textbf{2)} Г.Е. Иванов - Математический анализ, ч.1\n");
+}
+//!------------------------------------------
+void CountVars(treeElem_t *root)
+{
+    if (root->type == VAR)
+    {
+        int result = searchVar(root);
+        if (result)
+        {
+            G_Var.data[G_Var.cnt] = root->oper[0];
+            G_Var.cnt++;
+        }
+    }
+
+
+    if (LEFT)
+        CountVars(LEFT);
+
+    if (RIGHT)
+        CountVars(RIGHT);
+
+}
+//!------------------------------------------
+int searchVar(treeElem_t *root)
+{
+    for (int i = 0; i <= G_Var.cnt; i++)
+    {
+        if (root->oper[0] == G_Var.data[i])
+            return 0;
+    }
+
+    return TRUE;
 }
 //!------------------------------------------
 int treeOk(treeElem_t *root, unsigned int counter)
@@ -595,7 +720,7 @@ void optimizeTree(treeElem_t *root)
             foldPow(root);
             break;
         case EXP:
-            foldExp(root);
+            //foldExp(root);
             break;
     }
 }
@@ -798,7 +923,7 @@ void destroyTree(treeElem_t *root)
     dtor(root);
 }
 //!-----------------------------------------
-treeElem_t * diffFunc(treeElem_t * root)
+treeElem_t * diffFunc(treeElem_t * root, char varD, FILE* output)
 {
     assert(root);
 
@@ -808,10 +933,43 @@ treeElem_t * diffFunc(treeElem_t * root)
             return ctor(0, 0, NUMBER, NULL, NULL);
             break;
         case VAR:
-            return ctor(1, 0, NUMBER, NULL, NULL);
+            if (root->oper[0] == varD)
+                return ctor(1, 0, NUMBER, NULL, NULL);
+            else
+                return ctor(0, 0, NUMBER, NULL, NULL);
+
             break;
         case MUL:
         {
+            switch(G_rules.mul)
+            {
+                case 0:
+                    fprintf(output, "\\\\*Умножая свои добрые деяния, светлую сторону приближаешь ты\n");
+                    G_rules.mul++;
+                    break;
+                case 1:
+                    fprintf(output, "\\\\*Свет на стороне умножения. Ты в правильном направлении!\n");
+                    G_rules.mul++;
+                    break;
+            }
+
+            fprintf(output, "\\\\*$f(x) = ");
+            dumpTex(root, NULL, output);
+            fprintf(output, " \\Rightarrow ");
+
+            fprintf(output, "f ^{\\prime}_%c(x) = ", varD);
+            fprintf(output, "(");
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c(x)\\cdot(", varD);
+            dumpTex(RIGHT, NULL, output);
+            fprintf(output, ") + (");
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, ")\\cdot(");
+            dumpTex(RIGHT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c)", varD);
+            fprintf(output, "$\n");
+
+
             treeElem_t * newRoot = ctor(0, "+", ADD, NULL, NULL);
             treeElem_t * theLeft = ctor(0, "*", MUL, D(LEFT), COPY(RIGHT));
             treeElem_t * theRight = ctor(0, "*", MUL, COPY(LEFT), D(RIGHT));
@@ -822,15 +980,76 @@ treeElem_t * diffFunc(treeElem_t * root)
             break;
         }
         case ADD:
+        {
+            switch(G_rules.add)
+            {
+                case 0:
+                    fprintf(output, "\\\\*Прибавляй и умножай, и голландцев побеждай\n");
+                    G_rules.add++;
+                    break;
+                case 1:
+                    fprintf(output, "\\\\*Производная суммы настолько сложна, насколько наполнены смыслом песни Стаса Михайлова\n");
+                    G_rules.add++;
+                    break;
+            }
+
+            fprintf(output, "\\\\*$f(x) = ");
+            dumpTex(root, NULL, output);
+            fprintf(output, " \\Rightarrow f ^{\\prime}_%c = ( ", varD);
+
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c + (", varD);
+            dumpTex(RIGHT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c$\n", varD);
+
             return ctor(0, "+", ADD, D(LEFT), D(RIGHT));
             break;
+        }
         case SUB:
+            switch(G_rules.sub)
+            {
+                case 0:
+                    fprintf(output, "\\\\*Вычитание очевидно и тривиально\n");
+                    G_rules.sub++;
+                    break;
+                case 1:
+                    fprintf(output, "\\\\*Познай себя, убрав все лишнее\n");
+                    G_rules.sub++;
+                    break;
+            }
+
+            fprintf(output, "\\\\*$");
+            dumpTex(root, NULL, output);
+            fprintf(output, " \\Rightarrow f ^{\\prime}_%c = ( ", varD);
+
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c - (", varD);
+            dumpTex(RIGHT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c$\n", varD);
             return ctor(0, "-", SUB, D(LEFT), D(RIGHT));
             break;
         case POW:
         {
             if (RIGHT->type == NUMBER)
             {
+                switch(G_rules.pow)
+                {
+                    case 0:
+                        fprintf(output, "\\\\*Простепенись!\n");
+                        G_rules.pow++;
+                        break;
+                    case 1:
+                        fprintf(output, "\\\\*Степень - штука полезная, ее производная - тем более\n");
+                        G_rules.pow++;
+                        break;
+                }
+
+                fprintf(output, "$");
+                dumpTex(root, NULL, output);
+                fprintf(output, " \\Rightarrow f ^{\\prime}_%c = (", varD);
+                dumpTex(root, NULL, output);
+                fprintf(output, ")^{\\prime}_%c$\n", varD);
+
                 root->right->data -= 1;
                 treeElem_t * theRoot = ctor(0, 0, MUL, ctor(root->right->data + 1, 0, NUMBER, NULL, NULL) , COPY(root));
                 root->right->data += 1;
@@ -840,8 +1059,27 @@ treeElem_t * diffFunc(treeElem_t * root)
             }
             else
             {
+                switch(G_rules.exp)
+                {
+                    case 0:
+                        fprintf(output, "\\\\*Экспоненциальность существования... Да, она такая, суровая и неожиданная\n");
+                        G_rules.exp++;
+                        break;
+                    case 1:
+                        fprintf(output, "\\\\*В любой непонятной ситуации бери экспоненту\n");
+                        G_rules.exp++;
+                        break;
+                }
+
+                fprintf(output, "\\\\*$");
+                dumpTex(root, NULL, output);
                 treeElem_t * theExp = ctor(0, 0, EXP, ctor(0, 0, MUL, COPY(RIGHT), ctor(0, 0, LN, COPY(LEFT), NULL)), NULL);
                 SLASHES printf("exp is founded!\n");
+
+                fprintf(output, " \\Rightarrow f^{\\prime}_%c = (", varD);
+                dumpTex(theExp, NULL, output);
+                fprintf(output, ")^{\\prime}_%c$\n", varD);
+
                 dumpTree(theExp, NODEBUG, BEGIN, stdout);
                 return D(theExp);
             }
@@ -850,6 +1088,33 @@ treeElem_t * diffFunc(treeElem_t * root)
         }
         case DIV:
         {
+            switch (G_rules.div)
+            {
+                case 0:
+                    fprintf(output, "\\\\*Разделяй и властвуй!\n");
+                    G_rules.div++;
+                    break;
+                case 1:
+                    fprintf(output, "\\\\*Покажи себя! Возьми производную частного!\n");
+                    G_rules.div++;
+                    break;
+            }
+
+            fprintf(output, "\\\\*$f(x) = ");
+            dumpTex(root, NULL, output);
+            fprintf(output, "\\Rightarrow f^{\\prime}(x) = \\dfrac{(");
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c\\cdot (", varD);
+            dumpTex(RIGHT, NULL, output);
+            fprintf(output, ")-");
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, "\\cdot (");
+            dumpTex(RIGHT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c ", varD);
+            fprintf(output, "}{(");
+            dumpTex(RIGHT, NULL, output);
+            fprintf(output, ")^2}$\n");
+
             treeElem_t *UpSide = ctor(0, 0, SUB, ctor(0, 0, MUL, D(LEFT), COPY(RIGHT)), ctor(0, 0, MUL, COPY(LEFT), D(RIGHT)));
             treeElem_t *DownSide = ctor(0, 0, POW, COPY(root->right), ctor(2, 0, NUMBER, NULL, NULL));
             treeElem_t *Result = ctor(0, 0, DIV, UpSide, DownSide);
@@ -859,6 +1124,25 @@ treeElem_t * diffFunc(treeElem_t * root)
         }
         case SIN:
         {
+            switch(G_rules.sin)
+            {
+                case 0:
+                    fprintf(output, "\\\\*На темную сторону силы поглядывать стал? Аккуратнее\n");
+                    G_rules.sin++;
+                    break;
+                case 1:
+                    fprintf(output, "\\\\*Темная сторона овладевает тобой, Люк! Борись с Темным Лордом!\n");
+                    G_rules.sin++;
+                    break;
+            }
+
+            fprintf(output, "$\\\\*f(x) = ");
+            dumpTex(root, NULL, output);
+            fprintf(output, "\\Rightarrow f^{\\prime}_%c = cos(", varD);
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, " )\\cdot (");
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, ")^{\\prime}$\n");
             treeElem_t *CosNode = ctor(0, 0, COS, COPY(LEFT), NULL);
             treeElem_t *Result = ctor(0, 0, MUL, CosNode, D(LEFT));
             return Result;
@@ -866,6 +1150,20 @@ treeElem_t * diffFunc(treeElem_t * root)
         }
         case COS:
         {
+            switch(G_rules.cos)
+            {
+                case 0:
+                    fprintf(output, "\\\\*В чем сила, брат? А сила в косинусе\n ");
+                    fprintf(output, "$\\\\*cos^{\\prime}(...) = -sin(...)$\n");
+                    G_rules.cos++;
+                    break;
+                case 1:
+                    fprintf(output, "\\\\*Прими светлую сторону силы, о юный падаван\n");
+                    fprintf(output, "$\\\\*cos^{\\prime}(...) = -sin(...)$\n");
+                    G_rules.cos++;
+                    break;
+            }
+
             treeElem_t *SinNode = ctor(0, 0, SIN, COPY(LEFT), NULL);
             treeElem_t *ComplFunc = D(LEFT);
             treeElem_t *Result = ctor(0, 0, MUL, ctor(0, 0, MUL, SinNode, ComplFunc), ctor(-1, 0, NUMBER, NULL, NULL));
@@ -874,6 +1172,26 @@ treeElem_t * diffFunc(treeElem_t * root)
         }
         case LN:
         {
+            switch(G_rules.ln)
+            {
+                case 0:
+                    fprintf(output, "\\\\*Логарифмируй и побеждай!\n");
+                    G_rules.ln++;
+                    break;
+                case 1:
+                    fprintf(output, "\\\\*ЛОГАРИФМ МЫ БРАТЬ НЕ БРОСИМ, 1488!!!\n");
+                    G_rules.ln++;
+                    break;
+            }
+
+            fprintf(output, "\\\\*$ f(x) = ");
+            dumpTex(root, NULL, output);
+            fprintf(output, " \\Rightarrow f^{\\prime}_%c(x) = ", varD);
+            dumpTex(ctor(0, 0, DIV, ctor(1, 0, NUMBER, NULL, NULL), LEFT), NULL, output);
+            fprintf(output, " \\cdot (");
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c$\n", varD);
+
             treeElem_t *LnDiff = ctor(0, 0, DIV, ctor(1, 0, NUMBER, NULL, NULL), COPY(LEFT));
             treeElem_t *ComplFunc = D(LEFT);
             treeElem_t *Result = ctor(0, 0, MUL, LnDiff, ComplFunc);
@@ -882,7 +1200,17 @@ treeElem_t * diffFunc(treeElem_t * root)
         }
         case EXP:
         {
+
             treeElem_t *ExpBase = COPY(root);
+            //!-----------------------------
+            fprintf(output, "\\\\*Экспонента $f(x) = ");
+            dumpTex(ExpBase, NULL, output);
+            fprintf(output, "\\Rightarrow f^{\\prime}_%c = ", varD);
+            dumpTex(ExpBase, NULL, output);
+            fprintf(output, "\\cdot (");
+            dumpTex(LEFT, NULL, output);
+            fprintf(output, ")^{\\prime}_%c$\n", varD);
+            //!-----------------------------
             treeElem_t *PowDiff = D(LEFT);
             treeElem_t *Result = ctor(0, 0, MUL, ExpBase, PowDiff);
             return Result;
