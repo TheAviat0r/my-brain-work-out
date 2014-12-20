@@ -2,7 +2,7 @@
 //!============================================================================
 //!     @file       Stack_v1.c
 //!     @author     Niatshin Bulat
-//!     @task       Write stack with most useful operations like multuply, add and so on
+//!     @task       Write CPU with most useful operations like multuply, add and so on
 //!     @condition  I don't know what should I write here
 //!     @errors     ERR#1 - buffer adress is ZERO
 //!                 ERR#2 - buffer is overfilled
@@ -16,14 +16,15 @@
 #include <string.h>
 #include <assert.h>
 //!===========================================
-#define DEBUG
+#define NDEBUG
 #define MINE
-#ifdef DEBUG
+#define DEBUGSTK
+#ifdef DEBUGSTK
 #define assert_ok(cond) if(!(cond)){\
                         printf("FAIL: %s in %s, %d %;", \
                         #cond, __FILE__, __LINE__, __PRETTY_FUNCTION__);\
                         EMPT; dump_ok(work);};
-#else #define assert_ok(cond)
+#else #define assert_ok(cond) if(1 || cond);
 #endif
 
 #ifndef NOCALLDBG
@@ -57,7 +58,9 @@ enum Commands_t
 //!===========================================
 const int YES = 1;
 const int NO = 0;
+const int NUMBER = 1;
 const int STARTMEM = 5;
+const int VARLIM = 10;
 const int ax_code = 100499;
 const int bx_code = 100498;
 const int cx_code = 100497;
@@ -85,6 +88,10 @@ struct label_t
     int freemem;
     int *buffer;
 };
+
+//struct vars_t
+    double G_Var[VARLIM] = {};
+    //unsigned int cnt;
 //!===========================================
 //!             THIS IS CPU FUNCTIONS!
 void processComm (void);
@@ -92,6 +99,7 @@ void processComm (void);
 void formCommands (FILE *input, double list_comm[], int list_size);
 //!===========================================
 void dump_Comm (FILE *input, double list_comm[], int list_size, int position);
+void dumpVars (FILE *output);
 //!===========================================
 int get_endPosition(double list_comm[], int list_size);
 
@@ -178,9 +186,9 @@ void processComm(void)
         if (strcmp(seek, "commands:") == NULL)
         {
             fscanf(input, "%d", &num_command);
-            printf("num_comm = %d\n", num_command);
+            printf("Commands - %d\n", num_command);
 
-            list_size = 2*num_command + 1;
+            list_size = 4*num_command + 1;
             list_comm = (double *) calloc(list_size, sizeof(double));
         }
         else
@@ -224,7 +232,8 @@ void processComm(void)
         }
         #undef DEF_CMD
         dump_ok(&mystack);
-        dump_call(&call_stack);
+        dumpVars(stdout);
+        //dump_call(&call_stack);
 
         free(mystack.buffer);
         free(call_stack.buffer);
@@ -241,7 +250,6 @@ void processComm(void)
 void formCommands(FILE *input, double list_comm[], int list_size)
 {
     assert(list_comm != NULL);
-    printf("list_size = %d\n", list_size);
     //!            INITIALIZE WORKING VARIABLES
     //{===============================================
     double command = 0;
@@ -249,7 +257,6 @@ void formCommands(FILE *input, double list_comm[], int list_size)
     //}===============================================
 
     fscanf(input, "%lf", &command);
-    SLASHES
     while (command != CMD_END)
     {
         //printf("cycle commmand = <%d>\n", command);
@@ -302,6 +309,18 @@ void dump_Comm(FILE *input, double list_comm[], int list_size, int position)
         }
     }
     SLASHES EMPT
+}
+//!-------------------------------------------
+void dumpVars(FILE *output)
+{
+    assert(output);
+
+    SLASHES printf("\tVAR DUMP\n"); SLASHES
+    for (int i = 0; i < VARLIM; i++)
+    {
+        assert(0 <= i && i < VARLIM);
+        fprintf(output, "(%d) %lg\n", i, G_Var[i]);
+    }
 }
 //!===========================================
 
@@ -533,25 +552,6 @@ double popData(stack_t *work)
     assert_ok(stack_ok(work) == NULL);
 }
 //!===========================================
-void delData(stack_t *work)
-{
-    //work->buffer = 0;
-    assert_ok(stack_ok(work) == NULL);
-    printf("# Stack is empty now!\n");
-
-    work->freemem = STARTMEM;
-    work->stackSZ = STARTMEM;
-    work->cnt = 0;
-    work->buffer = (double *)realloc(work->buffer, STARTMEM*sizeof(double));;;;
-
-    for (int i = 0; i < work->stackSZ; ++i)
-    {
-        assert(0 <= i && i < work->stackSZ);
-        work->buffer[i] = 0;
-    }
-    assert_ok(stack_ok(work) == NULL);
-}
-//!===========================================
 void divData(stack_t *work)
 {
     stack_ok(work);
@@ -620,35 +620,6 @@ void multData(stack_t *work)
         //resData(work);
     }
     assert(stack_ok(work) == NULL);
-}
-//!===========================================
-void showData(stack_t *work)
-{
-    //printf("this is show data\n");
-    SLASHES;
-    assert(stack_ok(work) == NULL);
-    for (int i = 0; i < work->cnt; i++)
-    {
-        //assert(0 <= i && i < work->cnt);
-        printf("b[%d] = <%lg>\n", i, work->buffer[i]);
-    }
-    SLASHES;
-}
-//!===========================================
-void sumData(stack_t *work)
-{
-    double sum = 0;
-
-    assert(stack_ok(work) == NULL);
-    for (int i = work->cnt; i > 0; --i)
-    {
-        assert_ok(0 < i && i <= work->cnt);
-        sum += popData(work);
-    }
-    assert(stack_ok(work) == NULL);
-
-    pushData(work, sum);
-    //resData(work);
 }
 //!===========================================
 void sqrData(stack_t *work)

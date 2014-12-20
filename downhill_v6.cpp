@@ -11,6 +11,7 @@
 #define EMPT printf("\n");
 #define FEMPT fprintf(output, "\n");
 #define TAB printTab(depth, output);
+#define streq !strcmp
 //!------------------------------------------
 #define ASSERT_OK(name) assert(treeOk(name, 0) == NULL);
 //!------------------------------------------
@@ -29,6 +30,7 @@ enum Descriptor_t
     EQ = 11,
     OPER = 12,
     VAR = 13,
+    NEWVAR = 26,
     OP = 14,
     IF = 15,
     WHILE = 16,
@@ -98,6 +100,7 @@ const int BEGIN = 0;
 const int TRUE = 1;
 const int FALSE = 0;
 const int NOEXIST = -1;
+const int YES = 1;
 //!------------------------------------------
 const int DEBUG = 10;
 const int NODEBUG = 11;
@@ -154,6 +157,7 @@ void processTask();
                                                FILE *lex_dump, treeElem_t *root);
     int searchVar(char word[]);
     int searchFunc(char word[]);
+    int searchArg( char arg[]);
     void dumpVariables(FILE *output);
     //!-------- DOWNHILL FUNCS --------------
     void getDeclarations();
@@ -181,9 +185,14 @@ void processTask();
     void dtor(treeElem_t *work);
     int treeOk(treeElem_t *root, unsigned int counter);
     void destroyTree(treeElem_t *root);
+    void optimizeTree(treeElem_t *root);
+    void cutConst(treeElem_t *root);
+    void foldMul(treeElem_t *root);
+    void foldAddSub(treeElem_t *root);
     //!--------------------------------------
     void dumpTree(treeElem_t *node, const unsigned int mode, int depth, FILE *output);
     void printElem(const unsigned int mode, treeElem_t *node, const int depth, FILE *output);
+    void printCommands(treeElem_t *node, FILE *output);
     void printFuncNode(treeElem_t *node, FILE *output);
     void printNode(treeElem_t *node, FILE *output);
     void printUnderNode(treeElem_t *node, FILE *output);
@@ -230,6 +239,7 @@ void processTask()
 
     SLASHES printf("Amount of nodes - (%d)\n", node_amount);
     SLASHES printf("cnt_lex = %d\n", cnt_lex);
+    SLASHES dumpVariables(stdout);
 
     FILE *output = openFile("commands.txt");
     FILE *dump = openFile("dump.txt");
@@ -238,8 +248,10 @@ void processTask()
     if (Lexems.warn == FALSE)
     {
         dumpTree(tree, NODEBUG, BEGIN, viewTree);
-        dumpTree(tree, DEBUG, BEGIN, dump);
-        printFuncNode(tree, output);
+        //optimizeTree(tree);
+        dumpTree(tree, NODEBUG, BEGIN, dump);
+        //dumpVariables(stdout);
+        printCommands(tree, output);
     }
 
     FinishWork(input, output, dump, viewTree, lex_dump, tree);
@@ -511,6 +523,21 @@ void FinishWork(FILE *input, FILE *output,  FILE *dump, FILE *viewTree,
 //!-----------------------------------------
 //!           TREE FUNCTIONS
 //!-----------------------------------------
+void printCommands(treeElem_t *node, FILE * output)
+{
+    assert(node);
+    assert(output);
+    ASSERT_OK(node);
+
+    for (int i = 0; i < Variables.cnt; i++)
+    {
+        assert(0 <= i && i < Variables.cnt);
+        fprintf(output,"var %s\n", Variables.Var[i].name);
+    }
+
+    printFuncNode(node, output);
+}
+//!-----------------------------------------
 void printFuncNode(treeElem_t *node, FILE * output)
 {
     assert(node);
@@ -524,13 +551,13 @@ void printFuncNode(treeElem_t *node, FILE * output)
         treeElem_t * theFunc = node->left;
 
         if (strcmp(theFunc->oper, MAIN_STR) == NULL)
-            fprintf(output, "call f_skip0\n");
+            fprintf(output, "push 0\ncall main\n");
 
         fprintf(output, "jmp f_skip%u\n\n", func_skip);
-        fprintf(output, "func%d:\n", func_num);
+        fprintf(output, "%s:\n", theFunc->oper);
 
         if (strlen(FuncArgs->oper))
-            fprintf(output, "pop %s\n", FuncArgs->oper);
+            fprintf(output, "popv %s 0\n", FuncArgs->oper);
 
         printNode(FuncCode, output);
 
@@ -559,19 +586,41 @@ void printNode(treeElem_t *node, FILE *output)
     if (node->left && node->left->type == OP)
         printNode(node->left, output);
 
+    if (node->left && node->left->type == RETURN)
+    {
+        //printf("return is spotted!\n");
+        printUnderNode(node->left, output);
+    }
+
+    if (node->left && node->left->type == SHOW)
+    {
+        if (node->left->left->left == NULL)
+            fprintf(output, "outv %s 0\n", node->left->left->oper);
+        else
+            fprintf(output, "outv %s %d\n", node->left->left->oper, node->left->left->left->data);
+    }
+
     if (node->left && node->left->type == ASSIG)
     {
-        printf("= is spotted!\n");
+        //printf("= is spotted!\n");
         treeElem_t * newNode = node->left;
         printUnderNode(newNode->left, output);
-        fprintf(output, "pop %s\n", newNode->right->oper);
+
+        //if (newNode->right->type == NEWVAR)
+           // fprintf(output, "var %s\n", newNode->right->oper);
+
+        fprintf(output, "popv %s 0\n", newNode->right->oper);
     }
 
     if (node && node->type == ASSIG)
     {
         printf("= is spotted!\n");
         printUnderNode(node->left, output);
-        fprintf(output, "pop %s\n", node->right->oper);
+
+        //if (node->right->type == NEWVAR)
+            //fprintf(output, "var %s\n", node->right->oper);
+
+        fprintf(output, "popv %s 0\n", node->right->oper);
     }
 
 
@@ -632,7 +681,7 @@ void printNode(treeElem_t *node, FILE *output)
                 LABEL_YES
                 UNDERTREE_LEFT
                 UNDERTREE_RIGHT
-                fprintf(output, "jac whileN_%d\n", skip_num);
+                fprintf(output, "jac whileN_%d\n", while_num);
 
                 printNode(newNode->right, output);
 
@@ -648,7 +697,7 @@ void printNode(treeElem_t *node, FILE *output)
                 UNDERTREE_LEFT
                 UNDERTREE_RIGHT
                 //fprintf(output, "push 1\nmin\n");
-                fprintf(output, "ja whileN_%d\n", skip_num);
+                fprintf(output, "ja whileN_%d\n", while_num);
 
                 printNode(newNode->right, output);
 
@@ -664,7 +713,7 @@ void printNode(treeElem_t *node, FILE *output)
                 LABEL_YES
                 UNDERTREE_LEFT
                 UNDERTREE_RIGHT
-                fprintf(output, "jbc whileN_%d\n", skip_num);
+                fprintf(output, "jbc whileN_%d\n", while_num);
 
                 printNode(newNode->right, output);
 
@@ -679,7 +728,7 @@ void printNode(treeElem_t *node, FILE *output)
                 LABEL_YES
                 UNDERTREE_LEFT
                 UNDERTREE_RIGHT
-                fprintf(output, "jb whileN_%d\n", skip_num);
+                fprintf(output, "jb whileN_%d\n", while_num);
 
                 printNode(newNode->right, output);
 
@@ -694,7 +743,7 @@ void printNode(treeElem_t *node, FILE *output)
                 LABEL_YES
                 UNDERTREE_LEFT
                 UNDERTREE_RIGHT
-                fprintf(output, "jne whileN_%d\n", skip_num);
+                fprintf(output, "jne whileN_%d\n", while_num);
 
                 printNode(newNode->right, output);
 
@@ -709,13 +758,13 @@ void printNode(treeElem_t *node, FILE *output)
                 LABEL_YES
                 UNDERTREE_LEFT
                 UNDERTREE_RIGHT
-                fprintf(output, "je whileN_%d\n", skip_num);
+                fprintf(output, "je whileN_%d\n", while_num);
 
                 printNode(newNode->right, output);
 
                 UNDERTREE_LEFT
                 UNDERTREE_RIGHT
-                fprintf(output, "jne whileY_%d\n", skip_num);
+                fprintf(output, "jne whileY_%d\n", while_num);
                 LABEL_NO
                 while_num++;
                 skip_num++;
@@ -727,7 +776,7 @@ void printNode(treeElem_t *node, FILE *output)
         printNode(node->right, output);
 
 }
-
+//!-----------------------------------------
 void printUnderNode(treeElem_t * node, FILE *output)
 {
     assert(node);
@@ -742,7 +791,12 @@ void printUnderNode(treeElem_t * node, FILE *output)
     if (node->type == NUMBER)
         fprintf(output, "push %d\n", node->data);
     if (node->type == VAR)
-        fprintf(output, "pushr %s\n", node->oper);
+    {
+        if (!node->left)
+            fprintf(output, "pushv %s 0\n", node->oper);
+        else
+            fprintf(output, "pushv %s %d\n", node->left->data);
+    }
     if (node->type == ADD)
         fprintf(output, "add\n");
     if (node->type == SUB)
@@ -751,6 +805,10 @@ void printUnderNode(treeElem_t * node, FILE *output)
         fprintf(output, "mul\n");
     if (node->type == DIV)
         fprintf(output, "div\n");
+    if (node->type == CALLFUNC)
+        fprintf(output, "call %s\n", node->oper);
+    //if (node->type == RETURN)
+       // fprintf(output, "push\n");
 }
 //!-----------------------------------------
 void printElem(const unsigned int mode, treeElem_t *node, const int depth, FILE *output)
@@ -798,6 +856,10 @@ void printElem(const unsigned int mode, treeElem_t *node, const int depth, FILE 
                 TAB fprintf(output, ">=\n");
                 break;
             case VAR:
+                TAB fprintf(output, "%s\n", node->oper);
+                break;
+            case NEWVAR:
+                TAB fprintf(output, "NEWVAR\n");
                 TAB fprintf(output, "%s\n", node->oper);
                 break;
             case OP:
@@ -930,11 +992,124 @@ void dtor (treeElem_t *work)
 {
     assert(work);
 
-    work->left = NULL;
-    work->right = NULL;
+    if (work->left)
+        work->left = NULL;
+    if (work->right)
+        work->right = NULL;
     work->data = NULL;
     work->type = NUMBER;
     free(work);
+}
+//!-----------------------------------------
+void optimizeTree(treeElem_t *root)
+{
+    #define LEFT root->left
+    #define RIGHT root->right
+    ASSERT_OK(root);
+
+    if (root->left)
+        optimizeTree(root->left);
+    if (root->right)
+        optimizeTree(root->right);
+
+    if (root->left && root->right && root->left->type == NUMBER && root->right->type == NUMBER)
+        cutConst(root);
+
+    if (root->type == MUL)
+        foldMul(root);
+    if (root->type == ADD || root->type == SUB)
+        foldAddSub(root);
+}
+//!-----------------------------------------
+void foldMul(treeElem_t *root)
+{
+    #define CLEAN_LR root->left = NULL; root->right = NULL;
+    assert(root);
+
+    if ((root->left->type == NUMBER && root->left->data == 0) || (root->right->type == NUMBER && root->right->data == 0))
+    {
+        root->type = NUMBER;
+        root->data = 0;
+        root->oper[0] = '\0';
+        destroyTree(root->left);
+        destroyTree(root->right);
+        CLEAN_LR;
+        return;
+    }
+
+    if (root->left->type == NUMBER && root->left->data == 1)
+    {
+        dtor(root->left);
+        root->left = NULL;
+        *root = *(root->right);
+        return;
+    }
+
+    if (root->right->type == NUMBER && root->right->data == 1)
+    {
+        dtor(root->right);
+        root->right = NULL;
+        *root = *(root->left);
+        return;
+    }
+}
+//!-----------------------------------------
+void foldAddSub(treeElem_t *root)
+{
+    assert(root);
+
+    if (root->left->type == NUMBER && root->left->data == 0)
+    {
+        printf("left zero is spotted!\n");
+        dtor(root->left);
+        root->left = NULL;
+        *root= *(root->right);
+        return;
+    }
+
+    if (root->right->type == NUMBER && root->right->data == 0)
+    {
+        printf("right zero is spotted!\n");
+        dtor(root->right);
+        root->right = NULL;
+        *root = *(root->left);
+        return;
+    }
+}
+//!-----------------------------------------
+void cutConst(treeElem_t *root)
+{
+    assert(root);
+
+    #define CUT_LR root->left = NULL; root->right = NULL; free(root->left); free(root->right);
+    if (root->type == ADD)
+    {
+        root->type = NUMBER;
+        root->data = root->left->data + root->right->data;
+        CUT_LR
+    }
+
+    if (root->type == SUB)
+    {
+        root->type = NUMBER;
+        root->data = root->left->data - root->right->data;
+        CUT_LR
+    }
+
+    if (root->type == MUL)
+    {
+        root->type = NUMBER;
+        root->data = root->left->data * root->right->data;
+        CUT_LR
+    }
+
+    if (root->type == DIV)
+    {
+        root->type = NUMBER;
+        root->data = root->left->data / root->right->data;
+        CUT_LR
+    }
+    #undef CUT_LR
 }
 //!-----------------------------------------
 void destroyTree(treeElem_t *root)
@@ -980,6 +1155,22 @@ int searchFunc(char word[])
 
     return NOEXIST;
 }
+//!----------------------------------------
+int searchArg(char arg[])
+{
+    assert(arg);
+    assert(Functions.func);
+    assert(Functions.cnt <= VARLIM);
+
+    for (int i = 0; i <= Functions.cnt; i++)
+    {
+        assert(0 <= i && i <= Functions.cnt);
+        if (streq(arg, Functions.func[i].arg))
+            return i;
+    }
+
+    return NOEXIST;
+}
 //!-----------------------------------------
 void dumpVariables(FILE * output)
 {
@@ -989,7 +1180,7 @@ void dumpVariables(FILE * output)
     FEMPT
     fprintf(output, "Variables.cnt = %d\n", Variables.cnt);
 
-    for (int i = 0; i <= Variables.cnt; i++)
+    for (int i = 0; i < Variables.cnt; i++)
     {
         assert(0 <= i && i <= Variables.cnt);
         FSLASHES fprintf(output, "(%d) <%s>\n", i, Variables.Var[i].name);
@@ -1100,6 +1291,7 @@ treeElem_t * getStart()
     assert(cnt_lex <= Lexems.cnt);
 
     getDeclarations();
+    dumpDeclarations();
     treeElem_t * Start = (treeElem_t *) calloc(1, sizeof(treeElem_t));
     Start = getProg();
 
@@ -1164,10 +1356,23 @@ treeElem_t * getFunc()
                 char arg_name [STRLIM] = {};
                 if (Lexems.data[cnt_lex].Descriptor == VAR)
                 {
-                    strcpy(arg_name, Lexems.data[cnt_lex].oper);
-                    strcpy(Variables.Var[Variables.cnt].name , Lexems.data[cnt_lex].oper);
-                    Variables.cnt++;
+                    if (searchVar(Lexems.data[cnt_lex].oper) != NOEXIST)
+                        strcpy(arg_name, Lexems.data[cnt_lex].oper);
+                    else
+                    {
+                        printf("ERROR! Argument doesn't match with prototype in func '%s'!\n", Lexems.data[cnt_lex-2].oper);
+                        Lexems.warn = TRUE;
+                        return Func;
+                    }
+                    //strcpy(Variables.Var[Variables.cnt].name , Lexems.data[cnt_lex].oper);
+                    //Variables.cnt++;
                     cnt_lex++;
+                }
+                else
+                {
+                    printf("Argument is missing in func '%s'!\n", Lexems.data[cnt_lex - 2].oper);
+                    Lexems.warn = TRUE;
+                    return Func;
                 }
 
                 if (Lexems.data[cnt_lex].oper[0] == ')')
@@ -1234,7 +1439,7 @@ treeElem_t * getFuncReturn()
     treeElem_t * theReturn =  ctor(0, 0, RETURN, getAdd(), NULL);
     if (Lexems.data[cnt_lex].oper[0] != ';')
     {
-        printf("';' is missing in stroke %u!\n", Lexems.data[cnt_lex].oper);
+        printf("';' is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
         Lexems.warn = TRUE;
     }
     cnt_lex++;
@@ -1248,14 +1453,14 @@ void getDeclarations()
     assert(cnt_lex <= Lexems.cnt);
     assert(Functions.func);
 
-    while (strcmp(Lexems.data[cnt_lex].oper, FUNC_STR))
+    while (!streq(Lexems.data[cnt_lex].oper, FUNC_STR))
     {
-        if (strcmp(Lexems.data[cnt_lex].oper, DECLARE_STR) == NULL)
+        if (streq(Lexems.data[cnt_lex].oper, DECLARE_STR))
         {
             cnt_lex++;
             char func_name[STRLIM] = {};
 
-            if(strcmp(Lexems.data[cnt_lex].oper, FUNC_STR))
+            if(!streq(Lexems.data[cnt_lex].oper, FUNC_STR))
             {
                 strcpy(Functions.func[Functions.cnt].name, Lexems.data[cnt_lex].oper);
                 cnt_lex++;
@@ -1525,6 +1730,8 @@ treeElem_t * getRav()
     assert(cnt_lex <= Lexems.cnt);
 
     treeElem_t * Variable = NULL;
+    Descriptor_t type = VAR;
+    int NewDef = 0;
 
     if (Lexems.data[cnt_lex].Descriptor == VAR)
     {
@@ -1536,6 +1743,7 @@ treeElem_t * getRav()
             {
                 strcpy(Variables.Var[Variables.cnt].name, Lexems.data[cnt_lex].oper);
                 Variables.cnt++;
+                type = NEWVAR;
             }
             else
             {
@@ -1547,7 +1755,7 @@ treeElem_t * getRav()
 
         if (searchVar(Lexems.data[cnt_lex].oper) != NOEXIST)
         {
-            Variable = ctor(0, Lexems.data[cnt_lex].oper, VAR, NULL, NULL);
+            Variable = ctor(0, Lexems.data[cnt_lex].oper, type, NULL, NULL);
             cnt_lex++;
 
             if (Lexems.data[cnt_lex].Descriptor == ASSIG)

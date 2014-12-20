@@ -1,14 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <io.h>
 #include <assert.h>
 //!==================================================================
-#ifndef NODEBUG
-    #define assert_comm(cond) if (!cond)
-#endif
-#define SLASHES printf("==========================================\n");
+#define SLASHES printf("---------------------------------------------\n");
+#define FSLASHES fprintf(output, "---------------------------------------------\n");
+#define FEMPT fprintf(output, "\n");
 #define EMPT printf("\n");
+#define streq(name, arg) !strcmp(name, arg)
 //!==================================================================
 #define DEF_CMD(name, num, code) CMD_##name = num,
 enum Commands_t
@@ -26,7 +27,12 @@ const int dx_code = 100496;
 const int ex_code = 100495;
 const int fx_code = 100494;
 const int LABEL_LIM = 10;
+const int STRLIM = 100;
+const int VARLIM = 100;
+const int MAXCMDLEN = 20;
 const int NOEXIST   = -1;
+const int NUMBER_TAG = 1;
+const int VAR_TAG = 2;
 //!==================================================================
 //!                    HERE ARE STR CONSTANTS
 //{!==================================================================
@@ -41,6 +47,7 @@ const char str_DIV[] =      "div";
 const char str_SQR[] =      "sqr";
 const char str_SQRT[] =     "sqrt";
 const char str_OUT[] =      "out";
+const char str_IN[] =       "in";
 const char str_JB[] =       "jb";
 const char str_JA[] =       "ja";
 const char str_JAC[] =      "jac";
@@ -57,6 +64,10 @@ const char str_fx[] =       "fx";
 const char str_LABEL[] =    ":";
 const char str_CALL[] =     "call";
 const char str_RET[] =      "ret";
+const char str_VAR[] =      "var";
+const char str_PUSHV[] =    "pushv";
+const char str_POPV[] =     "popv";
+const char str_OUTV[] =     "outv";
 const char COMMAND[] =      "commands:";
 //}==================================================================
 struct label_t
@@ -64,6 +75,20 @@ struct label_t
     char name[20];
     int adress;
 };
+//!----------------------------------------
+struct stroke_t
+{
+    char symb[STRLIM];
+};
+//!----------------------------------------
+struct vars_t
+{
+    stroke_t data[VARLIM];
+    unsigned int cnt;
+};
+//!----------------------------------------
+vars_t G_Var = {};
+//!----------------------------------------
 //!==================================================================
 void ProcessAsm(void);
 //!==================================================================
@@ -71,6 +96,15 @@ void ProcessAsm(void);
     void dump_Comm(double *buffer, int buffer_len, int position);
     void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_size);
     void initiateLabels(label_t arr_label[]);
+    void treatCall(FILE *input, char command[], double arr_comm[],  int comm_size, int * i_comm, int pass,\
+                                                                    label_t arr_label[]);
+    void treatLabel(FILE *input, char command[], int command_len,   int pass, int * cnt_label,\
+                                                                    label_t arr_label[], int * i_comm);
+    void treatVar (FILE *input, char command[], int pass, double arr_comm[], int * i_comm, int comm_size);
+    void treatPushPopV (FILE *input, char command[], int pass, double arr_comm[], int * i_comm, int comm_size);
+
+    void dumpVar(FILE *output);
+    int searchVar(char word[]);
     int getLabel(label_t arr_label[], char target[]);
     int getEnd(double arr_comm[], int end_position);
 //!==================================================================
@@ -133,19 +167,10 @@ void ProcessAsm(void)
     {
         SLASHES;
         printf("input.txt successfully opened\n");
-        //!=======================================
+        //!----------------------------------------
         FILE *output = fopen("asmed.txt", "w");
-        //!         INITIALISE WORKING VALUES
-        //{=======================================
-        char command[10] = {};
-        char reg[10] = {};
-        double value = 0;
-        int jump_value = 0;
-        int cnt_comm = 0;
-
-        //}=======================================
-
-        int comm_size = 2 * cntComm(input, output) + 1;
+        //!----------------------------------------
+        int comm_size = 4 * cntComm(input, output) + 1;
         assert(comm_size != NULL);
         double * arr_comm = (double *) calloc(comm_size, sizeof(double));
         assert(arr_comm != NULL);
@@ -162,7 +187,8 @@ void ProcessAsm(void)
             fprintf(output, "%lg ", arr_comm[i]);
         }
 
-        //!======================================
+        dump_Comm (arr_comm, arr_label, comm_size, end_position);
+        //!--------------------------------------
         free(arr_comm);
         free(arr_label);
         fclose(input);
@@ -174,7 +200,7 @@ void ProcessAsm(void)
         printf("ERROR! Unable to open input.txt!\n");
     }
 }
-//!====================================
+//!----------------------------------
 int cntComm(FILE *input, FILE *output)
 {
     assert(input != NULL && output != NULL);
@@ -210,19 +236,19 @@ void initiateLabels(label_t arr_label[])
         arr_label[i].adress = NOEXIST;
     }
 }
-//!====================================
+//!------------------------------------
 //!     formCommands() reads commands from txt and fills it in an array of commands
-//!====================================
+//!------------------------------------
 void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_size)
 {
     assert(arr_comm != NULL && input != NULL && comm_size != NULL && arr_label != NULL);
     //!            INITIALIZE WORKING VARIABLES
     //{===============================================
-    char command[10] = {};
-    char reg[10] = {};
-    char label_name [20] = {};
-    char call_arg [20] = {};
-    char jump_label [20] = {};
+    char command[MAXCMDLEN] = {};
+    char reg[MAXCMDLEN] = {};
+    char label_name [MAXCMDLEN] = {};
+    char call_arg [MAXCMDLEN] = {};
+    char jump_label [MAXCMDLEN] = {};
 
     double push_value = 0;
     int i_comm = 0;
@@ -230,13 +256,17 @@ void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_
     int command_len = 0;
     //}===============================================
 
+    //!----------------------------------
+    #include "asm_defines.h"
+    //!----------------------------------
     for (int pass = 1; pass <= 2; ++pass)
     {
         assert(1 <= pass && pass <= 2);
         fscanf(input, "%s", command);
-
-        while (strcmp(command, str_END))
+        //!----------------------------------------------------------
+        while (!streq(command, str_END))
         {
+            //printf("command = (%s)\n", command);
             command_len = strlen(command);
             assert(command_len > 0);
             if (command_len <= 1)
@@ -244,10 +274,11 @@ void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_
                 printf("WRONG INPUT! COMMAND LENGTH SHOULD BE > 1\n");
                 exit(10);
             }
-
+            //!----------------------------------------------------------
+            //dump_Comm(arr_comm, arr_label, comm_size, i_comm);
             assert(0 <= i_comm && i_comm < comm_size);
-
-            if (!strcmp(command, str_PUSH))
+            //!----------------------------------------------------------
+            if (streq(command, str_PUSH))
             {
                 arr_comm[i_comm] = CMD_PUSH;
                 i_comm++;
@@ -269,242 +300,54 @@ void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_
                 }
             }
 
-            if (!strcmp(command, str_PUSHR))
+            if (streq(command, str_VAR))
             {
-                arr_comm[i_comm] = CMD_PUSHR;
-                i_comm++;
-
-                if (fscanf(input, "%s", reg) == 1)
-                {
-                    #define PUSHR(reg, name)\
-                                            if (!strcmp(reg, str_##name)) \
-                                            {\
-                                                arr_comm[i_comm] = name##_code;\
-                                                i_comm++;\
-                                                fscanf(input, "%s", command);\
-                                                continue;\
-                                            }
-                    PUSHR(reg, ax)
-                    PUSHR(reg, bx)
-                    PUSHR(reg, cx)
-                    PUSHR(reg, dx)
-                    PUSHR(reg, ex)
-                    PUSHR(reg, fx)
-
-                    #undef PUSHR
-
-                    SLASHES DBG printf("ERR_<pushr_argument>! WRONG REGISTER NAME!\n");
-                    dump_Comm(arr_comm, arr_label, comm_size, i_comm);
-                    exit(1);
-                }
-                else
-                {
-                    SLASHES DBG printf("ERR_<pushr_argument>! UNABLE TO READ REGISTER!\n");
-                    dump_Comm(arr_comm, arr_label, comm_size, i_comm);
-                    exit(1);
-                }
+                treatVar(input, command, pass, arr_comm, &i_comm, comm_size);
+                continue;
             }
 
-            if (!strcmp(command, str_POP))
+            if (streq(command, str_PUSHV) || streq(command, str_POPV) || streq(command, str_OUTV))
             {
-                arr_comm[i_comm] = CMD_POP;
-                i_comm++;
-
-                #define POPR(reg, name) if (!strcmp(reg, str_##name)) \
-                                        {\
-                                            arr_comm[i_comm] = name##_code;\
-                                            i_comm++;\
-                                            fscanf(input, "%s", command);\
-                                            continue;\
-                                        }
-                if (fscanf(input, "%s", reg) == 1)
-                {
-                    POPR(reg, ax)
-                    POPR(reg, bx)
-                    POPR(reg, cx)
-                    POPR(reg, dx)
-                    POPR(reg, ex)
-                    POPR(reg, fx)
-
-                    SLASHES DBG printf("ERR_<pop_argument>! WRONG REGISTER NAME!\n");
-                    dump_Comm(arr_comm, arr_label, comm_size, i_comm);
-                    exit(CMD_POP);
-                }
-                else
-                {
-                    SLASHES DBG printf("ERR_<pop_input>! UNABLE TO READ REGISTER\n");
-                    exit(CMD_POP + 1);
-                }
-                #undef POPR
+                treatPushPopV(input, command, pass, arr_comm, &i_comm, comm_size);
+                continue;
             }
 
-            //{!============<ARITHMETIC OPERATIONS ARE BELOW>===============
-            #define OPER(command, name) if (!strcmp(command, str_##name))\
-                                        {\
-                                            arr_comm[i_comm] = CMD_##name;\
-                                            i_comm++;\
-                                            fscanf(input, "%s", command);\
-                                            continue;\
-                                        }
+            //!----------------------------------------------------------
+            CMP(PUSHR)
+            CMP(POP)
+            CMP(OUT)
+            CMP(IN)
+
+            //{!============<OPERATIONS WITHOUT ARGUMENTS>===============
             OPER(command, ADD)
             OPER(command, MIN)
             OPER(command, MUL)
             OPER(command, DIV)
             OPER(command, SQR)
             OPER(command, SQRT)
-            #undef OPER
+            OPER(command, RET)
             //}!============================================================
 
-            if (command[command_len - 1] - ':' == 0)
+            if (command[command_len - 1] == ':')
             {
-                command[command_len - 1] = 0;
-                strcpy(label_name, command);
-                //printf("label = <%s>\n", label_name);
-                if (command[0] != NULL)
-                {
-                    if (pass == 1)
-                    {
-                        strcpy(arr_label[cnt_label].name, label_name);
-
-                        if (cnt_label < LABEL_LIM)
-                        {
-                            arr_label[cnt_label].adress = i_comm;
-                            cnt_label++;
-
-                            fscanf(input, "%s", command);
-                            continue;
-                        }
-                        else
-                        {
-                            printf("ERROR! ARRAY OF LABELS IS FULL! RECOMPILE PROGRAM\n!");
-                            exit(1488);
-                        }
-                    }
-
-                    fscanf(input, "%s", command);
-                    continue;
-                }
-                else
-                {
-                    SLASHES DBG printf("ERR_<label_argument>! UNABLE TO READ LABEL!\n");
-                    dump_Comm(arr_comm, arr_label, comm_size, i_comm);
-                    exit(1488);
-                }
-            }
-
-            if (!strcmp(command, str_CALL))
-            {
-                if (fscanf(input, "%s", call_arg) == 1)
-                {
-                    arr_comm[i_comm] = CMD_CALL;
-                    i_comm++;
-                    assert(0 <= i_comm && i_comm < comm_size);
-                    int callNum = getLabel(arr_label, call_arg);
-                    printf("callnum = %d\n", callNum);
-
-                    if (callNum == NOEXIST && pass == 2)
-                    {
-                        SLASHES DBG printf("ERR_<call_label>! UNABLE TO FIND LABEL <%s>!\n", call_arg);
-                        exit(CMD_CALL);
-                    }
-
-                    if (callNum >= 0 && arr_label[callNum].adress != NOEXIST)
-                        arr_comm[i_comm] = arr_label[callNum].adress;
-                    else
-                        arr_comm[i_comm] = NOEXIST;
-                    i_comm++;
-
-                    fscanf(input, "%s", command);
-                    continue;
-                }
-                else
-                {
-                    SLASHES DBG printf("ERR_<call_argument!>! UNABLE TO READ CALL!\n");
-                    dump_Comm(arr_comm, arr_label, comm_size, i_comm);
-                    exit(CMD_CALL + 1);
-                }
-            }
-            //{====================================================================
-            #define GETJMP(command, name)   if(!strcmp(command, str_##name))\
-                                            {\
-                                                if (fscanf(input, "%s", jump_label) == 1)\
-                                                {\
-                                                    arr_comm[i_comm] = CMD_##name;\
-                                                    i_comm++;\
-                                                    assert(0 <= i_comm && i_comm < comm_size);\
-                                                    int jumpNum = getLabel(arr_label, jump_label);\
-                                                    if (jumpNum == NOEXIST && pass == 2)\
-                                                    {\
-                                                        DBG printf("ERR_<jump_label!> UNABLE TO FIND\
-                                                                                LABEL <%s>!\n", jump_label);\
-                                                        exit(CMD_##name);\
-                                                    }\
-                                                    \
-                                                    if (jumpNum >= 0 && arr_label[jumpNum].adress != NOEXIST)\
-                                                        arr_comm[i_comm] = arr_label[jumpNum].adress;\
-                                                    else\
-                                                        arr_comm[i_comm] = NOEXIST;\
-                                                    i_comm++;\
-                                                    \
-                                                    fscanf(input, "%s", command);\
-                                                    continue;\
-                                                }\
-                                            }
-
-
-            GETJMP(command, JMP);
-            GETJMP(command, JB);
-            GETJMP(command, JBC);
-            GETJMP(command, JA);
-            GETJMP(command, JAC);
-            GETJMP(command, JE);
-            GETJMP(command, JNE);
-            #undef GETJMP
-            //}========================================================================
-
-            if (!strcmp(command, str_OUT))
-            {
-                if (fscanf(input, "%s", reg) == 1)
-                {
-                    arr_comm[i_comm] = CMD_OUT;
-                    i_comm++;
-                    #define OUTR(reg, name)\
-                                            if (!strcmp(reg, str_##name)) \
-                                            {\
-                                                arr_comm[i_comm] = name##_code;\
-                                                i_comm++;\
-                                                fscanf(input, "%s", command);\
-                                                continue;\
-                                            }
-                    OUTR(reg, ax);
-                    OUTR(reg, bx);
-                    OUTR(reg, cx);
-                    OUTR(reg, dx);
-                    OUTR(reg, ex);
-                    OUTR(reg, fx);
-                    #undef OUTR
-
-                    SLASHES DBG printf("ERR_<out_argument>! WRONG REGISTER NAME! TRY AGAIN!\n");
-                    dump_Comm(arr_comm, arr_label, comm_size, i_comm);
-                    exit(11);
-                }
-                else
-                {
-                    SLASHES DBG printf("ERR_<out_read>! UNABLE TO READ REGISTER!\N");
-                    dump_Comm(arr_comm, arr_label, comm_size, i_comm);
-                    exit(10);
-                }
-            }
-
-            if (!strcmp(command, str_RET))
-            {
-                arr_comm[i_comm] = CMD_RET;
-                i_comm++;
-                fscanf(input, "%s", command);
+                treatLabel(input, command, command_len, pass, &cnt_label, arr_label, &i_comm);
                 continue;
             }
 
-
+            if (streq(command, str_CALL))
+            {
+                treatCall(input, command, arr_comm, comm_size, &i_comm, pass, arr_label);
+                continue;
+            }
+            //{====================================================================
+            GETJMP(JMP)
+            GETJMP(JB)
+            GETJMP(JBC)
+            GETJMP(JA)
+            GETJMP(JAC)
+            GETJMP(JE)
+            GETJMP(JNE)
+            //}========================================================================
             SLASHES DBG printf("ERR_<command_input>! WRONG COMMAND <%s>!\n", command);
             dump_Comm(arr_comm, arr_label, comm_size, i_comm);
             exit(1488);
@@ -514,14 +357,235 @@ void formCommands(FILE *input, double arr_comm[], label_t arr_label[], int comm_
         rewind(input);
         i_comm = 0;
     }
-
-    dump_Comm(arr_comm, arr_label, comm_size, 0);
-
+    #undef PROCESSREG
+    #undef OPER
+    #undef GETJMP
+    #undef CMP
+    DBG printf("commands are formed!\n");
+    dumpVar(stdout);
+    //dump_Comm(arr_comm, arr_label, comm_size, 0);
 }
+
+void dumpVar(FILE *output)
+{
+    assert(output);
+    FEMPT FSLASHES fprintf(output, "\t VARS DUMP\n");
+    FSLASHES fprintf(output, "Var.cnt = %u\n", G_Var.cnt);
+
+    FSLASHES
+    for (int i = 0; i < G_Var.cnt; i++)
+    {
+        assert(0 <= i && i < G_Var.cnt);
+        fprintf(output, "%d) <%s>\n", i, G_Var.data[i].symb);
+    }
+}
+
+int searchVar(char word[])
+{
+    assert(word);
+
+    for (int i = 0; i < G_Var.cnt; i++)
+    {
+        assert(0 <= i && i < G_Var.cnt);
+        //printf("G_var[%d] (%s) vs (%s)\n", i, G_Var.data[i].symb, word);
+        if (strcmp(G_Var.data[i].symb, word) == NULL)
+            return i;
+    }
+
+    return NOEXIST;
+}
+
+void treatCall(FILE *input, char command[], double arr_comm[],  int comm_size, int * i_comm, int pass,\
+                                                                label_t arr_label[])
+{
+    assert(input != NULL);
+    assert(command != NULL);
+    assert(arr_comm != NULL);
+    assert(comm_size != NULL);
+    assert(i_comm != NULL);
+    assert(pass != NULL);
+    assert(arr_label != NULL);
+
+    char call_arg[MAXCMDLEN] = {};
+    if (fscanf(input, "%s", call_arg) == 1)
+    {
+        arr_comm[*i_comm] = CMD_CALL;
+        ++*i_comm;
+
+        assert(0 <= *i_comm && *i_comm <= comm_size);
+        int callNum = getLabel(arr_label, call_arg);
+
+        if (callNum == NOEXIST && pass == 2)
+        {
+            SLASHES DBG printf("ERR_<call_label>! Unable to find label <%s>!\n", call_arg);
+            exit(CMD_CALL);
+        }
+
+        if (callNum >= 0 && arr_label[callNum].adress != NOEXIST)
+            arr_comm[*i_comm] = arr_label[callNum].adress;
+        else
+            arr_comm[*i_comm] = NOEXIST;
+
+        ++*i_comm;
+
+        fscanf(input, "%s", command);
+        return;
+    }
+}
+
+void treatVar (FILE *input, char command[], int pass, double arr_comm[], int * i_comm, int comm_size)
+{
+    assert(input);
+    assert(command);
+    assert(pass == 1 || pass == 2);
+    assert(arr_comm);
+    assert(i_comm);
+
+    //arr_comm[*i_comm] = CMD_VAR;
+    /*(*i_comm)++;*/
+
+    assert(0 <= *i_comm && *i_comm <= comm_size);
+
+    fscanf(input, "%s", command);
+
+    if (pass == 1)
+    {
+        if (searchVar(command) != NOEXIST)
+        {
+            printf("ERROR! Redefenition of %s!\n", command);
+            dumpVar(stdout);
+            exit(3);
+        }
+
+        if (isalpha(command[0]))
+        {
+            strcpy(G_Var.data[G_Var.cnt].symb, command);
+            //arr_comm[*i_comm] = G_Var.cnt;
+            G_Var.cnt++;
+        }
+        else
+        {
+            printf("ERROR! Commands should begin with alpha! But not like this '%s'\n", command);
+            dumpVar(stdout);
+            exit(3);
+        }
+    }
+
+    /*(*i_comm)++;*/
+    fscanf(input, "%s", command);
+}
+
+void treatPushPopV (FILE *input, char command[], int pass, double arr_comm[], int * i_comm, int comm_size)
+{
+    assert(input);
+    assert(command);
+    assert(pass == 1 || pass == 2);
+    assert(arr_comm);
+    assert(i_comm);
+    assert(comm_size);
+
+    switch(command[2])
+    {
+        case 's':
+            arr_comm[*i_comm] = CMD_PUSHV;
+            (*i_comm)++;
+            break;
+        case 'p':
+            arr_comm[*i_comm] = CMD_POPV;
+            (*i_comm)++;
+            break;
+        case 't':
+            arr_comm[*i_comm] = CMD_OUTV;
+            (*i_comm)++;
+            break;
+        default:
+            printf("ERROR! FAIL IN COMPARISON BETWEEN PUSHV AND POPV!\n");
+            exit(4);
+            break;
+    }
+
+    assert(0 <= *i_comm && *i_comm <= comm_size);
+
+    fscanf(input, "%s", command);
+    if (searchVar(command) == NOEXIST)
+    {
+        printf("ERROR! Undeclared var %s!\n", command);
+        dumpVar(stdout);
+        exit(4);
+    }
+
+    arr_comm[*i_comm] = searchVar(command);
+    (*i_comm)++;
+
+    int position = 0;
+    int check = fscanf(input, "%d", &position);
+    if (check)
+    {
+        arr_comm[*i_comm] = NUMBER_TAG;
+        (*i_comm)++;
+        arr_comm[*i_comm] = position;
+        (*i_comm)++;
+        /*printf("ERROR! Unable to scan position!\n");
+        dumpVar(stdout);
+        exit(4);*/
+    }
+    else
+    {
+        arr_comm[*i_comm] = VAR_TAG;
+        (*i_comm)++;
+        fscanf(input, "%s", command);
+        arr_comm[*i_comm] = searchVar(command);
+        (*i_comm)++;
+    }
+
+    //printf("next check is passed!\n");
+
+    //arr_comm[*i_comm] = position;
+    /*(*i_comm)++;*/
+
+    fscanf(input, "%s", command);
+}
+
+void treatLabel(FILE *input,    char command[], int command_len, int pass,\
+                                int * cnt_label, label_t arr_label[], int * i_comm)
+{
+    assert (input != NULL && command_len != NULL && pass != NULL);
+    assert (cnt_label != NULL && *cnt_label >= 0 && arr_label != NULL && i_comm != NULL);
+
+    if (command[0] != NULL)
+    {
+        if (pass == 1)
+        {
+            if (*cnt_label < LABEL_LIM)
+            {
+                strncpy(arr_label[*cnt_label].name, command, command_len - 1);
+                arr_label[*cnt_label].adress = *i_comm;
+                ++*cnt_label;
+
+                fscanf(input, "%s", command);
+                return;
+            }
+            else
+            {
+                printf("ERROR! ARRAY OF LABELS IS FULL! RECOMPILE PROGRAM!\n");
+                exit(1488);
+            }
+        }
+
+        fscanf(input, "%s", command);
+        return;
+    }
+    else
+    {
+        SLASHES DBG printf("ERR_<label_argument>! UNABLE TO READ LABEL!\n");
+        exit(1488);
+    }
+}
+
 
 int getLabel(label_t arr_label[], char target[])
 {
-    assert(arr_label != NULL);
+    assert(arr_label != NULL && target != NULL);
 
     for (int cnt_label = 0; cnt_label < LABEL_LIM; ++cnt_label)
     {
