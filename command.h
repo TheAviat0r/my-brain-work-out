@@ -148,6 +148,26 @@ DEF_CMD (JNE,   18,     {   \
                                 position = new_position;\
                             }\
                     })
+DEF_CMD (IN, 19,        {\
+                            position++;\
+                            reg = list_comm[position];\
+                            double value = 0;\
+                            scanf("%lf", &value);\
+                            if (reg == ax_code)\
+                                mystack.reger[0] = value;\
+                            if (reg == bx_code)\
+                                mystack.reger[1] = value;\
+                            if (reg == cx_code)\
+                                mystack.reger[2] = value;\
+                            if (reg == dx_code)\
+                                mystack.reger[3] = value;\
+                            if (reg == ex_code)\
+                                mystack.reger[4] = value;\
+                            if (reg == fx_code)\
+                                mystack.reger[5] = value;\
+                            position++;\
+                        })
+
 DEF_CMD (CALL, 1337,    {   \
                             position++;\
                             int new_position = list_comm[position];\
@@ -157,6 +177,70 @@ DEF_CMD (CALL, 1337,    {   \
                         })
 DEF_CMD (RET,  1488,    {   \
                             position = popCall(&call_stack);\
-                            printf("ret position = %d\n", position);\
+                        })
+DEF_CMD (VAR, 100,      {
+                            //printf("var command!\n");
+                            //position++;
+                            //position++;
+                            //position++;
+                        })
+DEF_CMD (PUSHV, 105,    {  \
+                            position++;\
+                            int index = list_comm[position];\
+                            position++;\
+                            int mode = list_comm[position];\
+                            position++;
+                            int var_index = list_comm[position];\
+                            \
+                            if (mode == NUMBER)\
+                                pushData(&mystack, G_Var[index + var_index]);\
+                            else\
+                            {\
+                                int var_pos = list_comm[position];\
+                                var_index = G_Var[var_pos];\
+                                pushData(&mystack, G_Var[index + var_index]);\
+                            }\
+                            position++;\
+                        })
+DEF_CMD (POPV, 110,     {\
+                            position++;\
+                            int index = list_comm[position];\
+                            position++;\
+                            int mode = list_comm[position];\
+                            position++;\
+                            int var_index = list_comm[position];\
+                            \
+                            if (mode == NUMBER)\
+                                G_Var[index + var_index] = popData(&mystack);\
+                            else\
+                            {\
+                                int var_pos = list_comm[position];\
+                                var_index = G_Var[var_pos];\
+                                G_Var[index + var_index] = popData(&mystack);\
+                            }\
+                            position++;\
+                        })
+DEF_CMD (OUTV, 115,     {
+                            position++;\
+                            int index = list_comm[position];\
+                            position++;\
+                            int mode = list_comm[position];\
+                            position++;\
+                            int var_index = list_comm[position];\
+                            \
+                            printf("VAR#%lg ", index);\
+
+                            if (mode == NUMBER)\
+                            {\
+                                index += var_index;\
+                                printf("[%d] = (%lg)\n", index, G_Var[index + var_index]);\
+                            }\
+                            else\
+                            {\
+                                int var_pos = list_comm[position];\
+                                var_index = G_Var[var_pos];\
+                                printf("[%d] = (%lg) INDEX_VAR\n", index + var_index, G_Var[index + var_index]);\
+                            }\
+                            position++;\
                         })
 DEF_CMD (END, 100500, { })
