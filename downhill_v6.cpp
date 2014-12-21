@@ -31,6 +31,8 @@ enum Descriptor_t
     OPER = 12,
     VAR = 13,
     NEWVAR = 26,
+    NUMINDEX = 27,
+    VARINDEX = 28,
     OP = 14,
     IF = 15,
     WHILE = 16,
@@ -42,7 +44,8 @@ enum Descriptor_t
     RETURN = 22,
     ERROR = 23,
     SHOW = 24,
-    OUT = 25
+    OUT = 25,
+    TYPE = 29
 };
 //!------------------------------------------
 const int STRLIM = 100;
@@ -110,10 +113,12 @@ const char PREFIX[] = "tipa";
 char IFSTR[] = "if";
 char WHILESTR[] = "poka";
 const char FUNC_STR[] = "func";
+const char ARR_STR[] =  "array";
 const char DECLARE_STR[] = "declare";
 const char MAIN_STR[] = "main";
 const char RETURN_STR[] = "return";
 const char SHOW_STR[] = "show";
+const char TYPE_STR[] = "type";
 const char ja[] = "ja";
 const char jac[] = "jac";
 const char jb[] = "jb";
@@ -160,6 +165,7 @@ void processTask();
     int searchArg( char arg[]);
     void dumpVariables(FILE *output);
     //!-------- DOWNHILL FUNCS --------------
+    void getArrays();
     void getDeclarations();
         void dumpDeclarations();
     treeElem_t * getStart();
@@ -249,12 +255,13 @@ void processTask()
     {
         dumpTree(tree, NODEBUG, BEGIN, viewTree);
         //optimizeTree(tree);
-        dumpTree(tree, NODEBUG, BEGIN, dump);
+        dumpTree(tree, DEBUG, BEGIN, dump);
         //dumpVariables(stdout);
         printCommands(tree, output);
     }
 
     FinishWork(input, output, dump, viewTree, lex_dump, tree);
+    system("compile.bat");
 }
 //!------------------------------------------
 FILE * formBuffer(FILE *input)
@@ -423,6 +430,8 @@ Descriptor_t getType()
         return OPER;
     if (buffer[cnt] == ';')
         return OPER;
+    if (buffer[cnt] == '_')
+        return OPER;
 }
 //!-----------------------------------------
 void AddLexem(Descriptor_t type, int number, char express[STRLIM], unsigned int slashN)
@@ -529,10 +538,19 @@ void printCommands(treeElem_t *node, FILE * output)
     assert(output);
     ASSERT_OK(node);
 
+    int cell_cnt = 0;
+
     for (int i = 0; i < Variables.cnt; i++)
     {
         assert(0 <= i && i < Variables.cnt);
-        fprintf(output,"var %s\n", Variables.Var[i].name);
+
+        if (streq(Variables.Var[i].name, "ARRPOINT"))
+        {
+            fprintf(output, "var %s%d\n", Variables.Var[i].name, cell_cnt);
+            cell_cnt++;
+        }
+        else
+            fprintf(output,"var %s\n", Variables.Var[i].name);
     }
 
     printFuncNode(node, output);
@@ -592,12 +610,42 @@ void printNode(treeElem_t *node, FILE *output)
         printUnderNode(node->left, output);
     }
 
+    if (node->left && node->left->type == TYPE)
+    {
+        fprintf(output, "in\n");
+
+        if (node->left->left->left == NULL)
+            fprintf(output, "popv %s 0\n", node->left->left->oper);
+        else
+        {
+            switch(node->left->left->left->type)
+            {
+                case NUMINDEX:
+                    fprintf(output, "popv %s %d\n", node->left->left->oper, node->left->left->left->data);
+                    break;
+                case VARINDEX:
+                    fprintf(output, "popv %s %s\n", node->left->left->oper, node->left->left->left->oper);
+                    break;
+            }
+        }
+    }
+
     if (node->left && node->left->type == SHOW)
     {
         if (node->left->left->left == NULL)
             fprintf(output, "outv %s 0\n", node->left->left->oper);
         else
-            fprintf(output, "outv %s %d\n", node->left->left->oper, node->left->left->left->data);
+        {
+            switch(node->left->left->left->type)
+            {
+                case NUMINDEX:
+                    fprintf(output, "outv %s %d\n", node->left->left->oper, node->left->left->left->data);
+                    break;
+                case VARINDEX:
+                    fprintf(output, "outv %s %s\n", node->left->left->oper, node->left->left->left->oper);
+                    break;
+            }
+        }
     }
 
     if (node->left && node->left->type == ASSIG)
@@ -609,7 +657,29 @@ void printNode(treeElem_t *node, FILE *output)
         //if (newNode->right->type == NEWVAR)
            // fprintf(output, "var %s\n", newNode->right->oper);
 
-        fprintf(output, "popv %s 0\n", newNode->right->oper);
+        if (newNode->right->left == NULL)
+        {
+            printf("no index!\n");
+            fprintf(output, "popv %s 0\n", newNode->right->oper);
+        }
+        else
+        {
+            switch(newNode->right->left->type)
+            {
+                case NUMINDEX:
+                    printf("num index!\n");
+                    fprintf(output, "popv %s %d\n", newNode->right->oper, newNode->right->left->data);
+                    break;
+                case VARINDEX:
+                    printf("varindex!\n");
+                    fprintf(output, "popv %s %s\n", newNode->right->oper, newNode->right->left->oper);
+                    break;
+                default:
+                    printf("ERROR! Unable to print!\n");
+                    //printf("%d\n", newNode->right->type);
+                    break;
+            }
+        }
     }
 
     if (node && node->type == ASSIG)
@@ -618,9 +688,24 @@ void printNode(treeElem_t *node, FILE *output)
         printUnderNode(node->left, output);
 
         //if (node->right->type == NEWVAR)
-            //fprintf(output, "var %s\n", node->right->oper);
-
-        fprintf(output, "popv %s 0\n", node->right->oper);
+        //fprintf(output, "var %s\n", node->right->oper);
+        if (!node->right->left)
+            fprintf(output, "popv %s 0\n", node->right->oper);
+        else
+        {
+            switch(node->right->left->type)
+            {
+                case NUMINDEX:
+                    fprintf(output, "popv %s %d\n", node->right->oper, node->right->left->data);
+                    break;
+                case VARINDEX:
+                    fprintf(output, "popv %s %s\n", node->right->oper, node->right->left->oper);
+                    break;
+                default:
+                    printf("ERROR! Unable to print!\n");
+                    break;
+            }
+        }
     }
 
 
@@ -795,7 +880,21 @@ void printUnderNode(treeElem_t * node, FILE *output)
         if (!node->left)
             fprintf(output, "pushv %s 0\n", node->oper);
         else
-            fprintf(output, "pushv %s %d\n", node->left->data);
+        {
+            switch(node->left->type)
+            {
+                case NUMINDEX:
+                    fprintf(output, "pushv %s %d\n", node->oper, node->left->data);
+                    break;
+                case VARINDEX:
+                    fprintf(output, "pushv %s %s\n", node->oper, node->left->oper);
+                    break;
+                default:
+                    printf("ERROR! Unable to print!\n");
+                    break;
+            }
+        }
+            //fprintf(output, "pushv %s %d\n", node->left->data);
     }
     if (node->type == ADD)
         fprintf(output, "add\n");
@@ -859,8 +958,20 @@ void printElem(const unsigned int mode, treeElem_t *node, const int depth, FILE 
                 TAB fprintf(output, "%s\n", node->oper);
                 break;
             case NEWVAR:
+                TAB FEMPT
                 TAB fprintf(output, "NEWVAR\n");
                 TAB fprintf(output, "%s\n", node->oper);
+                TAB FEMPT
+                break;
+            case NUMINDEX:
+                TAB fprintf(output, "NUM_INDEX\n");
+                TAB fprintf(output, "%d\n", node->data);
+                TAB FEMPT
+                break;
+            case VARINDEX:
+                TAB fprintf(output, "VAR_INDEX\n");
+                TAB fprintf(output, "%s\n", node->oper);
+                TAB FEMPT
                 break;
             case OP:
                 TAB fprintf(output, "OP\n");
@@ -904,8 +1015,8 @@ void printElem(const unsigned int mode, treeElem_t *node, const int depth, FILE 
             case SHOW:
                 TAB fprintf(output, "SHOW\n");
                 break;
-            case OUT:
-                TAB fprintf(output, "OUT\n");
+            case TYPE:
+                TAB fprintf(output, "TYPE\n");
                 break;
             default:
                 printf("ERROR! %u Descriptor doesn't exist!\n", node->type);
@@ -1155,7 +1266,7 @@ int searchFunc(char word[])
 
     return NOEXIST;
 }
-//!----------------------------------------
+//!-----------------------------------------
 int searchArg(char arg[])
 {
     assert(arg);
@@ -1188,6 +1299,7 @@ void dumpVariables(FILE * output)
 }
 //!-----------------------------------------
 //                  RECURSIVE DOWNHILL FUNCS
+//!-----------------------------------------
 treeElem_t * getNum()
 {
     assert(Lexems.data);
@@ -1235,6 +1347,28 @@ treeElem_t * getVar()
 
         ASSERT_OK(tree);
         cnt_lex++;
+        //!--------------POSITIONING CASE------------------
+        if (Lexems.data[cnt_lex].oper[0] == '_')
+        {
+            printf("index case!\n");
+            cnt_lex++;
+
+            if (Lexems.data[cnt_lex].Descriptor == NUMBER)
+            {
+                printf("number case!\n");
+                tree->left = getNum();
+                tree->left->type = NUMINDEX;
+            }
+
+            if (Lexems.data[cnt_lex].Descriptor == VAR)
+            {
+                printf("var case!\n");
+                tree->left = getVar();
+                tree->left->type = VARINDEX;
+            }
+
+            printf("%s_%s\n", tree->oper, tree->left->oper);
+        }
     }
     else
     {
@@ -1244,6 +1378,40 @@ treeElem_t * getVar()
     }
 
     return tree;
+}
+//!------------------------------------------
+treeElem_t * getIn()
+{
+    assert(Lexems.data);
+    assert(cnt_lex <= Lexems.cnt);
+
+    treeElem_t * InCommand = ctor(0, 0, TYPE, NULL, NULL);
+
+    if (Lexems.data[cnt_lex].Descriptor == VAR)
+    {
+        if (streq(Lexems.data[cnt_lex].oper, TYPE_STR))
+        {
+            cnt_lex++;
+            InCommand->left = getVar();
+
+            if (Lexems.data[cnt_lex].oper[0] != ';')
+            {
+                printf("ERROR! ';' is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+                Lexems.warn = TRUE;
+                return InCommand;
+            }
+
+            cnt_lex++;
+            return InCommand;
+        }
+    }
+    else
+    {
+        printf("ERROR in type command in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+        Lexems.warn = TRUE;
+    }
+
+    return InCommand;
 }
 //!------------------------------------------
 treeElem_t * getShow()
@@ -1290,6 +1458,8 @@ treeElem_t * getStart()
     assert(Lexems.data);
     assert(cnt_lex <= Lexems.cnt);
 
+    if (streq(Lexems.data[cnt_lex].oper, ARR_STR))
+        getArrays();
     getDeclarations();
     dumpDeclarations();
     treeElem_t * Start = (treeElem_t *) calloc(1, sizeof(treeElem_t));
@@ -1301,6 +1471,7 @@ treeElem_t * getStart()
         printf("%s\n", Start->left->oper);
         Lexems.warn = TRUE;;
     }
+
     return Start;
 }
 //!------------------------------------------
@@ -1447,6 +1618,62 @@ treeElem_t * getFuncReturn()
     return theReturn;
 }
 //!------------------------------------------
+void getArrays()
+{
+    assert(Lexems.data);
+    assert(cnt_lex <= Lexems.cnt);
+    assert(Variables.Var);
+
+    while (!streq(Lexems.data[cnt_lex].oper, DECLARE_STR))
+    {
+        if (streq(Lexems.data[cnt_lex].oper, ARR_STR))
+        {
+            cnt_lex++;
+            char arr_name[STRLIM] = {};
+            const char fill_arr[] = "ARRPOINT";
+
+            strcpy(Variables.Var[Variables.cnt].name, Lexems.data[cnt_lex].oper);
+            Variables.cnt++;
+            cnt_lex++;
+
+            if (Lexems.data[cnt_lex].Descriptor == NUMBER)
+            {
+                int arr_size = Lexems.data[cnt_lex].data;
+                printf("arr_size = %d\n", arr_size);
+                cnt_lex++;
+
+                for (int i = 1; i < arr_size; i++)
+                {
+                    assert(1 <= i && i < arr_size);
+                    strcpy(Variables.Var[Variables.cnt].name, fill_arr);
+                    Variables.cnt++;
+                }
+            }
+            else
+            {
+                printf("ERROR! Stroke %u: array size should be number!\n", Lexems.data[cnt_lex].stroke);
+                Lexems.warn = TRUE;
+            }
+
+            if (Lexems.data[cnt_lex].oper[0] == ';')
+                cnt_lex++;
+            else
+            {
+                printf("ERROR! ';' is missing in stroke %u\n", Lexems.data[cnt_lex].stroke);
+                Lexems.warn = TRUE;
+            }
+        }
+        else
+        {
+            printf("ERROR! Wrong arr declaration in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+            Lexems.warn = TRUE;
+        }
+    }
+
+    if (cnt_lex == 0)
+        Lexems.warn = TRUE;
+}
+//!------------------------------------------s
 void getDeclarations()
 {
     assert(Lexems.data);
@@ -1460,47 +1687,44 @@ void getDeclarations()
             cnt_lex++;
             char func_name[STRLIM] = {};
 
-            if(!streq(Lexems.data[cnt_lex].oper, FUNC_STR))
-            {
-                strcpy(Functions.func[Functions.cnt].name, Lexems.data[cnt_lex].oper);
-                cnt_lex++;
+            strcpy(Functions.func[Functions.cnt].name, Lexems.data[cnt_lex].oper);
+            cnt_lex++;
 
-                if (Lexems.data[cnt_lex].oper[0] ==  '(')
+            if (Lexems.data[cnt_lex].oper[0] ==  '(')
+            {
+                cnt_lex++;
+                if (Lexems.data[cnt_lex].Descriptor == VAR)
+                {
+                    strcpy(Functions.func[Functions.cnt].arg, Lexems.data[cnt_lex].oper);
+                    strcpy(Variables.Var[Variables.cnt].name, Lexems.data[cnt_lex].oper);
+                    cnt_lex++;
+                    Functions.cnt++;
+                    Variables.cnt++;
+                }
+
+                if (Lexems.data[cnt_lex].oper[0] == ')')
                 {
                     cnt_lex++;
-                    if (Lexems.data[cnt_lex].Descriptor == VAR)
-                    {
-                        strcpy(Functions.func[Functions.cnt].arg, Lexems.data[cnt_lex].oper);
-                        strcpy(Variables.Var[Variables.cnt].name, Lexems.data[cnt_lex].oper);
+                    if (Lexems.data[cnt_lex].oper[0] == ';')
                         cnt_lex++;
-                        Functions.cnt++;
-                        Variables.cnt++;
-                    }
-
-                    if (Lexems.data[cnt_lex].oper[0] == ')')
-                    {
-                        cnt_lex++;
-                        if (Lexems.data[cnt_lex].oper[0] == ';')
-                            cnt_lex++;
-                        else
-                        {
-                            Lexems.warn = TRUE;
-                            printf("; is missing in stroke %u\n", Lexems.data[cnt_lex].stroke);
-                            return;
-                        }
-                    }
                     else
                     {
                         Lexems.warn = TRUE;
-                        printf(") is missing in stroke %u\n", Lexems.data[cnt_lex].stroke);
-                        break;
+                        printf("; is missing in stroke %u\n", Lexems.data[cnt_lex].stroke);
+                        return;
                     }
                 }
                 else
                 {
-                    printf("( is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+                    Lexems.warn = TRUE;
+                    printf(") is missing in stroke %u\n", Lexems.data[cnt_lex].stroke);
                     break;
                 }
+            }
+            else
+            {
+                printf("( is missing in stroke %u!\n", Lexems.data[cnt_lex].stroke);
+                break;
             }
 
         }
@@ -1512,7 +1736,7 @@ void getDeclarations()
         }
     }
 
-    dumpDeclarations();
+    //dumpDeclarations();
     //dumpVariables(stdout);
 }
 //!------------------------------------------
@@ -1578,16 +1802,18 @@ treeElem_t * getSkob()
         if (Lexems.data[cnt_lex].Descriptor == VAR)
         {
             //printf("this is Skob simple case %u\n", Lexems.data[cnt_lex].stroke);
-            if (strcmp(Lexems.data[cnt_lex].oper, "while") == NULL)
+            if (streq(Lexems.data[cnt_lex].oper, "while"))
                 return getWhile();
-            if (strcmp(Lexems.data[cnt_lex].oper, "if") == NULL)
+            if (streq(Lexems.data[cnt_lex].oper, "if"))
                 return getIF();
             if (Lexems.data[cnt_lex].Descriptor == VAR)
             {
-                if (strcmp(Lexems.data[cnt_lex].oper, RETURN_STR) == NULL)
+                if (streq(Lexems.data[cnt_lex].oper, RETURN_STR))
                     return getFuncReturn();
-                if (strcmp(Lexems.data[cnt_lex].oper, SHOW_STR) == NULL)
+                if (streq(Lexems.data[cnt_lex].oper, SHOW_STR))
                     return getShow();
+                if (streq(Lexems.data[cnt_lex].oper, TYPE_STR))
+                    return getIn();
 
                     return getRav();
             }
@@ -1731,12 +1957,12 @@ treeElem_t * getRav()
 
     treeElem_t * Variable = NULL;
     Descriptor_t type = VAR;
-    int NewDef = 0;
 
     if (Lexems.data[cnt_lex].Descriptor == VAR)
     {
         if (strcmp(Lexems.data[cnt_lex].oper, PREFIX) == NULL)
         {
+
             cnt_lex++;
 
             if (searchVar(Lexems.data[cnt_lex].oper) == NOEXIST)
@@ -1755,8 +1981,8 @@ treeElem_t * getRav()
 
         if (searchVar(Lexems.data[cnt_lex].oper) != NOEXIST)
         {
-            Variable = ctor(0, Lexems.data[cnt_lex].oper, type, NULL, NULL);
-            cnt_lex++;
+            Variable = getVar();//ctor(0, Lexems.data[cnt_lex].oper, type, NULL, NULL);
+            //cnt_lex++;
 
             if (Lexems.data[cnt_lex].Descriptor == ASSIG)
             {
