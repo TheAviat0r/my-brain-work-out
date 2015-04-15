@@ -10,18 +10,23 @@ enum REGS
     DI
 };
 
-const int STD_ENTRY[]             = { 0x55, 0x48, 0x89, //! mov  rbp, rsp
-                                      0xe5 };           //! push rbp
-const vector<unsigned char> ENTRY(STD_ENTRY, STD_ENTRY + sizeof(STD_ENTRY)/sizeof(unsigned char));
+const unsigned char STD_ENTRY_ARR[]   = { 0x55,               //! push rbp
+                                          0x48, 0x89,0xe5 };  //! mov rbp, rsp
+const vector<unsigned char> STD_ENTRY(STD_ENTRY_ARR, STD_ENTRY_ARR + sizeof(STD_ENTRY_ARR)/sizeof(unsigned char));
+const int STD_ENTRY_LEN           =  4;
+const int SOURCE_ENTRY_LEN        =  1;
 
-const int STD_LEAVE[]             = { 0xc9,//! leave
-                                      0xc3};//!ret
-const vector<unsigned char> LEAVE(STD_LEAVE, STD_LEAVE + sizeof(STD_LEAVE)/sizeof(unsigned char));
+const unsigned char STD_LEAVE_ARR[]   = { 0x5d,             //! pop  rbp
+                                          0xc3};            //!ret
+const vector<unsigned char> STD_LEAVE(STD_LEAVE_ARR, STD_LEAVE_ARR + sizeof(STD_LEAVE_ARR)/sizeof(unsigned char));
+const int STD_LEAVE_LEN           =  2;
+const int SOURCE_LEAVE_LEN        =  1;
 
 const unsigned char PUSH_BYTE     =   0x6a; //! push_byte
 
 const int           PUSH_DWORD    =   0x68; //! push + value
-const int           PUSH_LEN      =   2;
+const int           PUSHB_LEN     =   2;
+const int           PUSHDW_LEN    =   5;
 const int           OLD_PUSH_LEN  =   2;
 
 const int           POP           =   0x58; //! from x58 to x5f - rax -> rdi
@@ -128,4 +133,12 @@ const vector<unsigned char> POPV_NUM(POPV_ARR_INDEX, POPV_ARR_INDEX + sizeof(POP
 const int POPV_NUM_LEN = 10;
 const int OLD_POPV_LEN = 4;
 
+const unsigned char PUSHV_NUM_INDEX_ARR[]   = { 0xff, 0x34, 0x25, 0x0, 0x0, 0x0, 0x0 }; //! last 4 bytes - adress)
+const vector<unsigned char> PUSHV_NUM_INDEX (PUSHV_NUM_INDEX_ARR, PUSHV_NUM_INDEX_ARR + sizeof(PUSHV_NUM_INDEX_ARR));
+const int SOURCE_PUSHV_LEN    = 4;
+const int PUSHV_NUM_INDEX_LEN = 7;
 
+const unsigned char PUSHV_VAR_INDEX_ARR[]  = { 0x4c, 0x8b, 0x34, 0x25, 0x0, 0x0, 0x0, 0x0, //! mov r14, [adress]
+                                               0x41, 0xff, 0xb6, 0x0, 0x0, 0x0, 0x0 };
+const vector<unsigned char> PUSHV_VAR_INDEX (PUSHV_VAR_INDEX_ARR, PUSHV_VAR_INDEX_ARR + sizeof(PUSHV_VAR_INDEX_ARR));
+const int PUSHV_VAR_INDEX_LEN = 15;

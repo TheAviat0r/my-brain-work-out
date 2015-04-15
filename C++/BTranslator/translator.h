@@ -39,6 +39,9 @@ const int fx_code = 100494;
 const int NUM_INDEX = 1;
 const int VAR_INDEX = 2;
 
+const int BYTE = 1;
+const int DWORD = 2;
+
 void dword_rev(vector<unsigned char>& result, int source);
 
 void dword_rev(vector<unsigned char>& result, int source)
@@ -65,7 +68,7 @@ void void_rev(vector<unsigned char>& result, void * buffer)
 {
     unsigned long work = 0;
 
-    printf("\n\tBEFORE: %x\n", buffer);
+    //printf("\n\tBEFORE: %x\n", buffer);
 
     while (buffer > 0)
     {
@@ -81,10 +84,10 @@ void void_rev(vector<unsigned char>& result, void * buffer)
     for (size_t i = result.size(); i < sizeof(int); i++)
         result.push_back(0);
 
-    printf("\n\tAFTER:   ");
+    /*printf("\n\tAFTER:   ");
 
     for (size_t i = 0; i < 4; i++)
         printf("%x ", result[i]);
 
-    cout << endl;
+    cout << endl;*/
 }

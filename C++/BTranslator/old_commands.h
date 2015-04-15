@@ -178,6 +178,8 @@ DEF_CMD (CALL, 25,    {   \
 DEF_CMD (RET,  26,    {   \
                             position = popCall(&call_stack);\
                         })
+DEF_CMD (ENTRY, 27,    {})
+DEF_CMD (LEAVE, 28,    {})
 DEF_CMD (VAR, 100,      {
                             //printf("var command!\n");
                             //position++;
