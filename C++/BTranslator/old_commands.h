@@ -168,14 +168,14 @@ DEF_CMD (IN, 19,        {\
                             position++;\
                         })
 
-DEF_CMD (CALL, 1337,    {   \
+DEF_CMD (CALL, 25,    {   \
                             position++;\
                             int new_position = list_comm[position];\
                             position++;\
                             pushCall(&call_stack, position);
                             position = new_position;\
                         })
-DEF_CMD (RET,  1488,    {   \
+DEF_CMD (RET,  26,    {   \
                             position = popCall(&call_stack);\
                         })
 DEF_CMD (VAR, 100,      {
