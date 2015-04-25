@@ -1,0 +1,10 @@
+var a
+var b
+
+push 15
+popv a 0
+
+pop ax
+ret
+
+end
