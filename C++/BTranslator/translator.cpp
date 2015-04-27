@@ -11,7 +11,7 @@ inline void push_cnts (vector<position_t>& positions, int& old_cnt, int& new_cnt
 
 struct jump_t
 {
-    size_t  from;
+    int     from;
     int     old_to;
     bool    is_conditional;
     //!------------------------------------
@@ -24,7 +24,7 @@ struct jump_t
 
 struct adress_t
 {
-    size_t to;
+    int to;
     int    old_adress;
     adress_t (int fill_to, int var_index): to(fill_to), old_adress(var_index) {}
 };
@@ -38,6 +38,7 @@ class CProgram
         fstream&              input_;
         vector<unsigned char> code_;
         void *                exec_buf_;
+        void *                work_buf_;
         vector<position_t>    positions_;
         vector<jump_t>        jumps_;
         vector<adress_t>      vars_;
@@ -60,6 +61,7 @@ class CProgram
         void Translate      ();
         void dump_code      () const;
         void dump_buf       () const;
+        void dump_vars      () const;
         void dump           () const;
         void jit_compile    ();
 };
@@ -70,6 +72,8 @@ void binJump    (vector<unsigned char>& code, vector<jump_t>& jumps,
                                            int old_to, bool is_conditional);
 void binPopV    (vector<unsigned char>& code, vector<adress_t>& vars_, fstream& input);
 int  binPushV   (vector<unsigned char>& code, vector<adress_t>& vars_, fstream& input);
+void binOutputCall (vector<unsigned char>& code, vector<jump_t>& jumps);
+void binInputCall  (vector<unsigned char>& code, vector<jump_t>& jumps);
 void insertJump();
 
 CProgram::CProgram (std::fstream& input):
@@ -112,23 +116,35 @@ void CProgram::dump_buf()  const
     cout << endl;
     cout << endl << "\tVARS SEGMENT" << endl;
 
-    for (size_t i = 0; i < var_amount_; i++)
+    for (int i = 0; i < var_amount_; i++)
     {
         if (i && i % sizeof(long) == 0)
             cout << endl;
 
         printf("%x ", var_buf[i]);
-        //printf("%x ", *(unsigned char *)(exec_buf_ + code_.size() + i));
     }
 
     cout << endl;
 
     printf("var seg begin - 0x%x\n", /*exec_buf_ + code_.size()*/ var_buf);
 
-    cout << "\n\tVAR DUMP" << endl;
+    //dump_vars();
+
+    /*cout << "\n\tVAR DUMP" << endl;
 
     for (size_t i = 0; i < vars_.size(); i++)
-        printf("insert_to (%d) index - %d\n", vars_[i].to, vars_[i].old_adress);
+        printf("insert_to (%d) index - %d\n", vars_[i].to, vars_[i].old_adress);*/
+}
+
+void CProgram::dump_vars() const
+{
+    cout << "\n\tVAR DUMP" << endl;
+    cout << "-----------------------" << endl;
+
+    for (size_t i = 0; i < var_amount_; i++)
+        cout << var_buf[i] << " ";
+
+    cout << endl;
 }
 
 void CProgram::dump_code() const
@@ -216,6 +232,11 @@ void CProgram::Translate()
 
     cout << "command amount: " << cmd_amount_ << endl << "var amount: " << var_amount_ << endl;
 
+    code_.insert(code_.end(), OUT_FUNC.begin(), OUT_FUNC.end());
+    PUSH_CNT(1, OUT_FUNC_LEN);
+    code_.insert(code_.end(), IN_FUNC.begin(), IN_FUNC.end());
+    PUSH_CNT(1, IN_FUNC_LEN);
+
     for (int cmd_cnt = 0; cmd_cnt < cmd_amount_ ; cmd_cnt++)
     {
         READ_CMD;
@@ -260,49 +281,49 @@ void CProgram::Translate()
             case CMD_JMP:
                 code_.push_back(JMP_CODE);
                 READ_NUM_INT;
-                binJump(code_, jumps_, work_int, false);
+                binJump(code_, jumps_, work_int + 2, false);
                 PUSH_CNT(OLD_JMP_LEN, JMP_LEN);
                 break;
             case CMD_JA:
                 code_.INSERT_CODE(JA);
                 READ_NUM_INT;
                 PUSH_CNT(OLD_JA_LEN, JA_LEN);
-                binJump(code_, jumps_, work_int, true);
+                binJump(code_, jumps_, work_int + 2, true);
                 break;
             case CMD_JAC:
                 code_.INSERT_CODE(JAC);
                 READ_NUM_INT;
                 PUSH_CNT(OLD_JA_LEN, JA_LEN);
-                binJump(code_, jumps_, work_int, true);
+                binJump(code_, jumps_, work_int + 2, true);
                 break;
             case CMD_JB:
                 code_.INSERT_CODE(JB);
                 READ_NUM_INT;
                 PUSH_CNT(OLD_JA_LEN, JA_LEN);
-                binJump(code_, jumps_, work_int, true);
+                binJump(code_, jumps_, work_int + 2, true);
                 break;
             case CMD_JBC:
                 code_.INSERT_CODE(JBC);
                 READ_NUM_INT;
                 PUSH_CNT(OLD_JA_LEN, JA_LEN);
-                binJump(code_, jumps_, work_int, true);
+                binJump(code_, jumps_, work_int + 2, true);
                 break;
             case CMD_JE:
                 code_.INSERT_CODE(JE);
                 READ_NUM_INT;
                 PUSH_CNT(OLD_JA_LEN, JA_LEN);
-                binJump(code_, jumps_, work_int, true);
+                binJump(code_, jumps_, work_int + 2, true);
                 break;
             case CMD_JNE:
                 code_.INSERT_CODE(JNE);
                 READ_NUM_INT;
                 PUSH_CNT(OLD_JA_LEN, JA_LEN);
-                binJump(code_, jumps_, work_int, true);
+                binJump(code_, jumps_, work_int + 2, true);
                 break;
             case CMD_CALL:
                 code_.push_back(CALL_CODE);
                 READ_NUM_INT;
-                binJump(code_, jumps_, work_int, false);
+                binJump(code_, jumps_, work_int + 2, false);
                 PUSH_CNT(OLD_CALL_LEN, CALL_LEN);
                 break;
             case CMD_ENTRY:
@@ -328,6 +349,14 @@ void CProgram::Translate()
                 {
                     PUSH_CNT(SOURCE_PUSHV_LEN, PUSHV_VAR_INDEX_LEN);
                 }
+                break;
+            case CMD_OUT:
+                binOutputCall(code_, jumps_);
+                PUSH_CNT(1, CALL_LEN);
+                break;
+            case CMD_IN:
+                binInputCall(code_, jumps_);
+                PUSH_CNT(1, CALL_LEN);
                 break;
             default:
                 printf("unknown command - %d\n", work);
@@ -420,10 +449,10 @@ void binJump(vector<unsigned char>& code, vector<jump_t>& jumps,
                                           int old_to, bool is_conditional)
 {
     if (!is_conditional)
-        jumps.push_back(jump_t(code.size() - 1, old_to, false));
+        jumps.push_back(jump_t((int)code.size() - 1, old_to, false));
     else
     {
-        jumps.push_back(jump_t(code.size() - 7, old_to, true));
+        jumps.push_back(jump_t((int)code.size() - 7, old_to, true));
     }
 
     for (int i = 0; i < 4; i++)
@@ -473,6 +502,28 @@ int  binPushV(vector<unsigned char>& code, vector<adress_t>& vars, fstream& inpu
         vars.push_back(adress_t(code.size() - 4,  var_adress));
         return VAR_INDEX;
     }
+
+    return 0;
+}
+
+void binOutputCall(vector<unsigned char>& code, vector<jump_t>& jumps)
+{
+    code.push_back(CALL_CODE);
+
+    jumps.push_back(jump_t((int)code.size() - 1, 0, false));
+
+    for (size_t j = 0; j < 4; j++)
+        code.push_back(0);
+}
+
+void binInputCall(vector<unsigned char>& code, vector<jump_t>& jumps)
+{
+    code.push_back(CALL_CODE);
+
+    jumps.push_back(jump_t((int)code.size() - 1, 1, false)); //! 1 - because IN is 2nd command
+
+    for (size_t j = 0; j < 4; j++)
+        code.push_back(0);
 }
 
 void CProgram::insertJumps()
@@ -486,11 +537,13 @@ void CProgram::insertJumps()
             if (positions_[j].b96cnt == jumps_[i].old_to)
             {
                 if (!jumps_[i].is_conditional)
-                    value = positions_[j].x86cnt - jumps_[i].from - 5;
+                    value = (positions_[j].x86cnt - jumps_[i].from - 5);
                 else
                     value = positions_[j].x86cnt - jumps_[i].from - 11;
             }
         }
+
+        cout << "VALUE - " << value << endl;
 
         vector<unsigned char> byte_number;
         dword_rev(byte_number, value);
@@ -527,22 +580,22 @@ void CProgram::insertAdresses()
 void CProgram::jit_compile()
 {
     exec_buf_ = alloc_writeable_memory(code_.size() + var_amount_*sizeof(long));    //! emit_code will add ret instr into buf
+    work_buf_ = exec_buf_ + OUT_FUNC_LEN + IN_FUNC_LEN;
     emit_code(exec_buf_);
     insertAdresses();
     make_memory_executable(exec_buf_, code_.size() + var_amount_*sizeof(long));
 
-    dump_code();
+
+    //dump_code();
     dump_buf();
 
-    int (*func)() = (int (*)())exec_buf_;
-    printf("\nresult = %d\n", func());
+    cout << endl << "TESTS BEGINNING!" << endl;
+    cout         << "----------------" << endl;
 
-    dump_buf();
-}
-
-void print(int a)
-{
-    printf("value = %d\n", a);
+    void (*func)() = (void (*)())work_buf_;
+    //int (*func)() = (int (*)())work_buf_;
+    //printf("result = %d\n", func());
+    func();
 }
 
 int main()
@@ -554,6 +607,6 @@ int main()
     CProgram Program(input);
     Program.Translate();
     Program.jit_compile();
-
+    Program.dump_vars();
     return 0;
 }

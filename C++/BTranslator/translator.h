@@ -46,29 +46,34 @@ void dword_rev(vector<unsigned char>& result, int source);
 
 void dword_rev(vector<unsigned char>& result, int source)
 {
-    assert(result.empty());
-
     int work = 0;
 
-    while (source > 0)
+    printf("\nBEFORE:\n \t %x\n", source);
+
+    for (int i = 0; i < 4; i++)
     {
         work = source;
         work = work & 0xFF;
 
-        result.push_back((unsigned char) work);
+        result.push_back(work);
 
         source = source >> 8;
     }
 
-    for (size_t i = result.size(); i < sizeof(int); i++)
-        result.push_back(0);
-}
+    /*cout << endl;
 
+    printf("\nAFTER:\n \t ");
+
+    for (size_t i = 0; i < sizeof(int); i++)
+        printf("%x ", result[i]);
+
+    cout << endl;*/
+}
 void void_rev(vector<unsigned char>& result, void * buffer)
 {
     unsigned long work = 0;
 
-    //printf("\n\tBEFORE: %x\n", buffer);
+    printf("\n\tBEFORE: %x\n", buffer);
 
     while (buffer > 0)
     {
@@ -84,10 +89,10 @@ void void_rev(vector<unsigned char>& result, void * buffer)
     for (size_t i = result.size(); i < sizeof(int); i++)
         result.push_back(0);
 
-    /*printf("\n\tAFTER:   ");
+    printf("\n\tAFTER:   ");
 
     for (size_t i = 0; i < 4; i++)
         printf("%x ", result[i]);
 
-    cout << endl;*/
+    cout << endl;
 }
