@@ -1,0 +1,1 @@
+It will be a bunch of usual university projects as a part of an advanced project programming course.
